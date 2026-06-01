@@ -1,0 +1,28 @@
+# env / secrets
+.env
+*.local
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+
+# node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# go
+/services/*/bin/
+*.test
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/

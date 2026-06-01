@@ -1,0 +1,116 @@
+{{/*
+dashboard — Next.js UI + read API. Stateless, horizontally scalable.
+Reads ClickHouse over HTTP and Postgres. Auth optional (none|oidc).
+*/}}
+{{- $pgSecret := include "costobs.postgres.dsnSecret" . | fromJson -}}
+{{- $chHttpSecret := include "costobs.clickhouse.httpUrlSecret" . | fromJson -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "costobs.fullname" . }}-dashboard
+  labels:
+    {{- include "costobs.componentLabels" (dict "ctx" . "component" "dashboard") | nindent 4 }}
+spec:
+  {{- if not .Values.dashboard.autoscaling.enabled }}
+  replicas: {{ .Values.dashboard.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "dashboard") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "dashboard") | nindent 8 }}
+      {{- with .Values.dashboard.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "costobs.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: dashboard
+          image: {{ include "costobs.image" (dict "ctx" . "image" .Values.dashboard.image) }}
+          imagePullPolicy: {{ include "costobs.pullPolicy" (dict "ctx" . "image" .Values.dashboard.image) }}
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret.name }}
+                  key: {{ $pgSecret.key }}
+            - name: CLICKHOUSE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $chHttpSecret.name }}
+                  key: {{ $chHttpSecret.key }}
+            - name: COSTOBS_AUTH_MODE
+              value: {{ .Values.dashboard.authMode | quote }}
+            - name: COSTOBS_DEFAULT_ORG_SLUG
+              value: {{ .Values.dashboard.defaultOrgSlug | quote }}
+            {{- if eq .Values.dashboard.authMode "oidc" }}
+            - name: COSTOBS_OIDC_ISSUER
+              value: {{ required "dashboard.oidc.issuer is required when authMode=oidc" .Values.dashboard.oidc.issuer | quote }}
+            - name: COSTOBS_OIDC_CLIENT_ID
+              value: {{ required "dashboard.oidc.clientId is required when authMode=oidc" .Values.dashboard.oidc.clientId | quote }}
+            {{- if .Values.dashboard.oidc.existingSecret }}
+            - name: COSTOBS_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.dashboard.oidc.existingSecret }}
+                  key: client-secret
+            {{- end }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            # Next.js standalone server needs a writable cache dir; the rest of
+            # the root filesystem stays read-only.
+            - name: nextjs-cache
+              mountPath: /app/.next/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: nextjs-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.dashboard.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,325 @@
+# =============================================================================
+# CostObs Helm chart — default values (Mode B self-hosting).
+# =============================================================================
+#
+# DESIGN NOTE — bundled databases vs. external chart dependencies
+# ----------------------------------------------------------------
+# This chart does NOT depend on any external Helm subcharts (e.g. Bitnami
+# postgresql / clickhouse). Instead it ships its own minimal single-node
+# Postgres and ClickHouse StatefulSets, gated by `postgres.enabled` and
+# `clickhouse.enabled`.
+#
+# Why:
+#   * Air-gapped / offline first. `helm install` pulls ZERO Helm repos. Every
+#     dependency is a plain OCI image you can `docker pull` once and mirror
+#     into a private registry — nothing reaches out to a chart repo at deploy
+#     time. This directly satisfies the "works fully offline, no mandatory
+#     cloud deps" requirement.
+#   * BYO databases stay first-class. For any real deployment, set
+#     `postgres.enabled=false` / `clickhouse.enabled=false` and point at an
+#     external managed Postgres and ClickHouse Cloud / cluster via DSNs.
+#
+# SECRETS
+# -------
+# Database credentials and the dev API key are sourced from Kubernetes
+# Secrets. The chart can generate a Secret for you (see `secret.*`), or you can
+# supply your own via `existingSecret` fields. DSNs that embed passwords are
+# assembled at runtime from Secret values and injected via `valueFrom` where
+# practical; full DSNs for external databases are stored in a Secret, never as
+# plaintext in the rendered Deployment env.
+# =============================================================================
+
+# -- Override the chart name used in resource names.
+nameOverride: ""
+# -- Override the full release-qualified name.
+fullnameOverride: ""
+
+# Global image settings. Per-component `image.repository` / `image.tag` below
+# override these. Set `global.imageRegistry` to mirror everything through a
+# private registry for air-gapped installs (e.g. "registry.internal:5000").
+global:
+  # -- Optional registry prefix prepended to every image repository.
+  imageRegistry: ""
+  # -- Default image pull policy for all CostObs components.
+  imagePullPolicy: IfNotPresent
+  # -- Image pull secrets applied to every workload + service account.
+  imagePullSecrets: []
+  #  - name: my-regcred
+
+# -----------------------------------------------------------------------------
+# ingest — Go telemetry ingestion API. Stateless, horizontally scalable.
+# Listens on :8080. POST /v1/events, GET /healthz, GET /metrics.
+# -----------------------------------------------------------------------------
+ingest:
+  image:
+    repository: ghcr.io/officialasishkumar/costobs-ingest
+    tag: ""            # defaults to .Chart.AppVersion when empty
+    pullPolicy: ""     # defaults to global.imagePullPolicy when empty
+  # -- Baseline replica count (ignored if autoscaling.enabled — HPA owns it then).
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 8080
+  # Batching knobs (COSTOBS_BATCH_MAX_EVENTS / COSTOBS_BATCH_MAX_INTERVAL).
+  batch:
+    maxEvents: 1000
+    maxInterval: "2s"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 0   # 0 disables the memory metric
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -----------------------------------------------------------------------------
+# dashboard — Next.js UI + read API. Stateless, horizontally scalable.
+# Reads ClickHouse over HTTP (:8123) and Postgres. Listens on :3000.
+# -----------------------------------------------------------------------------
+dashboard:
+  image:
+    repository: ghcr.io/officialasishkumar/costobs-dashboard
+    tag: ""
+    pullPolicy: ""
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 3000
+  # Auth mode: "none" (single-user / trusted-network) or "oidc".
+  authMode: none
+  oidc:
+    issuer: ""
+    clientId: ""
+    # Secret holding key `client-secret` (the OIDC client secret). Required
+    # when authMode=oidc. Leave empty to skip wiring the secret.
+    existingSecret: ""
+  # Default org slug the dashboard scopes to (COSTOBS_DEFAULT_ORG_SLUG).
+  defaultOrgSlug: default
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 0
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -----------------------------------------------------------------------------
+# alertd — periodic alert evaluator. SINGLETON worker: replicas is pinned to 1
+# (it is a timer-driven loop, not a request server; running >1 would double-fire
+# alerts). Listens on :8081 for health/metrics only. NOT autoscaled.
+# -----------------------------------------------------------------------------
+alertd:
+  image:
+    repository: ghcr.io/officialasishkumar/costobs-alertd
+    tag: ""
+    pullPolicy: ""
+  # -- Pinned to 1. Do not raise: alertd is a singleton periodic worker.
+  replicas: 1
+  # COSTOBS_EVAL_INTERVAL — how often the evaluation loop runs.
+  evalInterval: "60s"
+  # Health/metrics port (COSTOBS_HTTP_ADDR defaults to :8081).
+  port: 8081
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -----------------------------------------------------------------------------
+# postgres — metadata store (orgs, users, api_keys, alert rules, overrides).
+# Set enabled=false and fill external.dsn to BYO a managed Postgres.
+# -----------------------------------------------------------------------------
+postgres:
+  # -- Deploy a bundled single-node Postgres StatefulSet. Set false for BYO.
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: ""
+  # Database name / credentials for the bundled instance. When `existingSecret`
+  # is empty the chart generates a Secret containing user/password/db and
+  # builds the DSN from them. Provide `existingSecret` to bring your own.
+  auth:
+    database: costobs
+    username: costobs
+    # If empty AND no existingSecret, a random password is generated on first
+    # install and persisted in the chart-managed Secret.
+    password: ""
+    # Secret with keys: postgres-password, and optionally postgres-dsn.
+    existingSecret: ""
+  service:
+    port: 5432
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""    # "" = cluster default
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # BYO external Postgres. Used when enabled=false.
+  external:
+    # Full DSN, e.g. postgres://user:pass@host:5432/costobs?sslmode=require
+    # Stored in a chart-managed Secret unless `existingSecret` is set below.
+    dsn: ""
+    # Secret holding the external DSN under key `postgres-dsn`. Preferred for
+    # production so the password never appears in values.yaml.
+    existingSecret: ""
+
+# -----------------------------------------------------------------------------
+# clickhouse — events / time-series store. Single-node bundled instance for
+# small deploys; BYO ClickHouse Cloud / cluster for large.
+# The native protocol (:9000) is used by ingest/alertd/migrations; the HTTP
+# interface (:8123) is used by the dashboard.
+# -----------------------------------------------------------------------------
+clickhouse:
+  # -- Deploy a bundled single-node ClickHouse StatefulSet. Set false for BYO.
+  enabled: true
+  image:
+    repository: clickhouse/clickhouse-server
+    tag: "24.8-alpine"
+    pullPolicy: ""
+  auth:
+    database: costobs
+    username: costobs
+    password: ""
+    # Secret with keys: clickhouse-password, and optionally clickhouse-dsn /
+    # clickhouse-http-url.
+    existingSecret: ""
+  service:
+    nativePort: 9000
+    httpPort: 8123
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  # BYO external ClickHouse. Used when enabled=false.
+  external:
+    # Native DSN for ingest/alertd/migrations:
+    #   clickhouse://user:pass@host:9000/costobs
+    dsn: ""
+    # HTTP URL for the dashboard:
+    #   https://user:pass@host:8443/costobs   (ClickHouse Cloud uses 8443)
+    httpUrl: ""
+    # Secret holding keys `clickhouse-dsn` and `clickhouse-http-url`.
+    existingSecret: ""
+
+# -----------------------------------------------------------------------------
+# migrations — golang-migrate one-shot Jobs run as Helm pre-install /
+# pre-upgrade hooks (mirrors compose `pg-migrate` + `ch-migrate`). The SQL is
+# mounted from ConfigMaps generated from this chart's migrations/ directory.
+# -----------------------------------------------------------------------------
+migrations:
+  enabled: true
+  image:
+    repository: migrate/migrate
+    tag: "v4.17.1"
+    pullPolicy: ""
+  # Hook deletion policy: keep failed Jobs around for debugging.
+  hookDeletePolicy: before-hook-creation,hook-succeeded
+  backoffLimit: 3
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# -----------------------------------------------------------------------------
+# devSeed — seed a default org + dev API key on first boot (Mode A parity).
+# Default OFF. Never enable in production. When enabled, ingest runs its
+# `seed` subcommand via a post-install/post-upgrade Job (idempotent) AND sets
+# COSTOBS_DEV_SEED so the ingest server also self-seeds.
+# -----------------------------------------------------------------------------
+devSeed:
+  enabled: false
+  orgSlug: default
+  # Plaintext key used only when existingSecret is empty (dev convenience).
+  apiKey: costobs_dev_secret_key
+  # Secret holding the dev API key under key `dev-api-key`.
+  existingSecret: ""
+
+# -----------------------------------------------------------------------------
+# ingress — exposes the dashboard (and optionally the ingest API).
+# -----------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  # Host for the dashboard UI.
+  host: costobs.example.com
+  # Optional separate host for the ingest API. If empty, the ingest API is
+  # exposed at `/v1` on the dashboard host instead.
+  ingestHost: ""
+  annotations: {}
+  #  cert-manager.io/cluster-issuer: letsencrypt-prod
+  #  nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  tls:
+    enabled: false
+    # Secret containing tls.crt / tls.key. With cert-manager this is the name
+    # cert-manager will create/populate.
+    secretName: costobs-tls
+
+# -----------------------------------------------------------------------------
+# serviceAccount — one SA shared by all CostObs workloads.
+# -----------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Prometheus scrape annotations applied to ingest + alertd pods (/metrics).
+metrics:
+  podAnnotations:
+    prometheus.io/scrape: "true"
+
+# Common pod security context applied to all CostObs workloads.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL

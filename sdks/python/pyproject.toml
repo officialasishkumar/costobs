@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "costobs"
+version = "0.1.0"
+description = "CostObs Python SDK — drop-in AI/LLM cost observability with zero hot-path latency."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "CostObs" }]
+keywords = ["llm", "openai", "anthropic", "gemini", "observability", "cost", "telemetry"]
+dependencies = [
+    "httpx>=0.23",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.30"]
+gemini = ["google-genai>=0.3"]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "ruff>=0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/officialasishkumar/costobs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["costobs"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"costobs/data/pricing-v2026.06.yaml" = "costobs/data/pricing-v2026.06.yaml"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

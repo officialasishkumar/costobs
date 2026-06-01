@@ -1,0 +1,57 @@
+# CostObs — SMALL self-hosted deploy.
+#
+# Bundled single-node Postgres + ClickHouse, one replica of each app tier,
+# modest resources, dev seed ON (demo), no ingress (use port-forward).
+#
+#   helm install costobs deploy/helm/costobs -f deploy/k8s-examples/values-small.yaml
+#
+# After install, follow the port-forward instructions printed in NOTES.
+
+postgres:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+clickhouse:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: "1", memory: 2Gi }
+
+ingest:
+  replicas: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+
+dashboard:
+  replicas: 1
+  authMode: none
+  autoscaling:
+    enabled: false
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+alertd:
+  replicas: 1
+  evalInterval: "60s"
+
+# Demo convenience: seed a default org + dev API key on first boot.
+# DO NOT use in production — disable and rotate the key.
+devSeed:
+  enabled: true
+  orgSlug: default
+  apiKey: costobs_dev_secret_key
+
+ingress:
+  enabled: false

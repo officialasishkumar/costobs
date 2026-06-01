@@ -1,0 +1,115 @@
+# Mode A: localhost / single-machine. `docker compose up` brings up the whole stack.
+# Everything runs offline. No external service calls, no telemetry, no licensing checks.
+name: costobs
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-costobs}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-costobs}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-costobs}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    deploy:
+      resources:
+        limits: { memory: 2g }   # laptop-friendly cap
+    ports: ["8123:8123", "9000:9000"]
+    volumes:
+      - ch_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-costobs}
+      POSTGRES_USER: ${POSTGRES_USER:-costobs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-costobs}
+    deploy:
+      resources:
+        limits: { memory: 512m }
+    ports: ["5432:5432"]
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-costobs}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  pg-migrate:
+    image: migrate/migrate:v4.17.1
+    depends_on:
+      postgres: { condition: service_healthy }
+    volumes:
+      - ./db/postgres/migrations:/migrations:ro
+    command: >
+      -path=/migrations
+      -database=postgres://${POSTGRES_USER:-costobs}:${POSTGRES_PASSWORD:-costobs}@postgres:5432/${POSTGRES_DB:-costobs}?sslmode=disable
+      up
+    restart: on-failure
+
+  ch-migrate:
+    image: migrate/migrate:v4.17.1
+    depends_on:
+      clickhouse: { condition: service_healthy }
+    volumes:
+      - ./db/clickhouse/migrations:/migrations:ro
+    command: >
+      -path=/migrations
+      -database=clickhouse://clickhouse:9000?username=${CLICKHOUSE_USER:-costobs}&password=${CLICKHOUSE_PASSWORD:-costobs}&database=${CLICKHOUSE_DB:-costobs}&x-multi-statement=true
+      up
+    restart: on-failure
+
+  ingest:
+    build:
+      context: .
+      dockerfile: services/ingest/Dockerfile
+    depends_on:
+      pg-migrate: { condition: service_completed_successfully }
+      ch-migrate: { condition: service_completed_successfully }
+    environment:
+      COSTOBS_HTTP_ADDR: ":8080"
+      COSTOBS_CLICKHOUSE_DSN: "clickhouse://${CLICKHOUSE_USER:-costobs}:${CLICKHOUSE_PASSWORD:-costobs}@clickhouse:9000/${CLICKHOUSE_DB:-costobs}"
+      COSTOBS_POSTGRES_DSN: "postgres://${POSTGRES_USER:-costobs}:${POSTGRES_PASSWORD:-costobs}@postgres:5432/${POSTGRES_DB:-costobs}?sslmode=disable"
+      COSTOBS_BATCH_MAX_EVENTS: "1000"
+      COSTOBS_BATCH_MAX_INTERVAL: "2s"
+      COSTOBS_DEV_SEED: "true"          # seeds default org + dev API key on boot
+      COSTOBS_DEV_API_KEY: "${COSTOBS_DEV_API_KEY:-costobs_dev_secret_key}"
+      COSTOBS_DEV_ORG_SLUG: "${COSTOBS_DEV_ORG_SLUG:-default}"
+    ports: ["8080:8080"]
+
+  alertd:
+    build:
+      context: .
+      dockerfile: services/alertd/Dockerfile
+    depends_on:
+      pg-migrate: { condition: service_completed_successfully }
+      ch-migrate: { condition: service_completed_successfully }
+    environment:
+      COSTOBS_CLICKHOUSE_DSN: "clickhouse://${CLICKHOUSE_USER:-costobs}:${CLICKHOUSE_PASSWORD:-costobs}@clickhouse:9000/${CLICKHOUSE_DB:-costobs}"
+      COSTOBS_POSTGRES_DSN: "postgres://${POSTGRES_USER:-costobs}:${POSTGRES_PASSWORD:-costobs}@postgres:5432/${POSTGRES_DB:-costobs}?sslmode=disable"
+      COSTOBS_EVAL_INTERVAL: "60s"
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    depends_on:
+      pg-migrate: { condition: service_completed_successfully }
+      ch-migrate: { condition: service_completed_successfully }
+    environment:
+      CLICKHOUSE_URL: "http://${CLICKHOUSE_USER:-costobs}:${CLICKHOUSE_PASSWORD:-costobs}@clickhouse:8123/${CLICKHOUSE_DB:-costobs}"
+      POSTGRES_DSN: "postgres://${POSTGRES_USER:-costobs}:${POSTGRES_PASSWORD:-costobs}@postgres:5432/${POSTGRES_DB:-costobs}?sslmode=disable"
+      COSTOBS_AUTH_MODE: "${COSTOBS_AUTH_MODE:-none}"
+      COSTOBS_DEFAULT_ORG_SLUG: "${COSTOBS_DEV_ORG_SLUG:-default}"
+    ports: ["3000:3000"]
+
+volumes:
+  ch_data:
+  pg_data:

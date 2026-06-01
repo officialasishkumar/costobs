@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS pricing_overrides;
+DROP TABLE IF EXISTS dashboards;
+DROP TABLE IF EXISTS alert_targets;
+DROP TABLE IF EXISTS alert_rules;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS memberships;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS orgs;

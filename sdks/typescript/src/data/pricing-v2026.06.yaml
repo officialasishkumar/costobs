@@ -1,0 +1,86 @@
+# CostObs pricing data — source of truth, consumed by SDK + backend.
+# Per-token prices (NOT per-1M) to keep the SDK hot path a single multiply.
+# Edit this file and bump `version`; no SDK release required.
+version: "2026.06"
+currency: USD
+models:
+  # ---- OpenAI ----
+  - provider: openai
+    model: gpt-4o
+    match: prefix
+    input_per_token: 0.0000025
+    cached_input_per_token: 0.00000125
+    output_per_token: 0.00001
+    image_tiers:
+      - name: default
+        per_tile: 0.000213
+        base: 0.0
+
+  - provider: openai
+    model: gpt-4o-mini
+    match: prefix
+    input_per_token: 0.00000015
+    cached_input_per_token: 0.000000075
+    output_per_token: 0.0000006
+
+  - provider: openai
+    model: o3
+    match: prefix
+    input_per_token: 0.000002
+    cached_input_per_token: 0.0000005
+    output_per_token: 0.000008
+    reasoning_per_token: 0.000008   # reasoning billed at output rate
+
+  - provider: openai
+    model: text-embedding-3-small
+    operation: embedding
+    input_per_token: 0.00000002
+    output_per_token: 0.0
+
+  # ---- Anthropic ----
+  - provider: anthropic
+    model: claude-opus-4
+    match: prefix
+    input_per_token: 0.000015
+    cached_input_per_token: 0.0000015   # cache-read rate
+    output_per_token: 0.000075
+
+  - provider: anthropic
+    model: claude-sonnet-4
+    match: prefix
+    input_per_token: 0.000003
+    cached_input_per_token: 0.0000003
+    output_per_token: 0.000015
+
+  - provider: anthropic
+    model: claude-haiku-4
+    match: prefix
+    input_per_token: 0.0000008
+    cached_input_per_token: 0.00000008
+    output_per_token: 0.000004
+
+  # ---- Google Gemini ----
+  - provider: gemini
+    model: gemini-2.5-pro
+    match: prefix
+    input_per_token: 0.00000125
+    cached_input_per_token: 0.0000003125
+    output_per_token: 0.00001
+
+  - provider: gemini
+    model: gemini-2.5-flash
+    match: prefix
+    input_per_token: 0.0000003
+    cached_input_per_token: 0.000000075
+    output_per_token: 0.0000025
+
+  # ---- Audio (per-second billing) ----
+  - provider: deepgram
+    model: nova-3
+    operation: audio
+    audio_per_second: 0.0000071
+
+  - provider: elevenlabs
+    model: eleven_multilingual_v2
+    operation: audio
+    audio_per_second: 0.0001

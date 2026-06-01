@@ -1,0 +1,12 @@
+# Patterns to ignore when packaging the chart.
+# NOTE: migrations/ is intentionally NOT ignored — its *.sql files are embedded
+# into ConfigMaps via .Files.Glob at template time.
+.DS_Store
+.git/
+.gitignore
+*.tmp
+*.bak
+*.swp
+*.orig
+.idea/
+.vscode/

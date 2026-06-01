@@ -1,0 +1,89 @@
+# CostObs — PRODUCTION self-hosted deploy.
+#
+# BYO external managed Postgres + ClickHouse (bundled instances disabled),
+# ingest 3 replicas + HPA, dashboard 2 replicas + HPA, ingress + TLS,
+# OIDC auth ON, dev seed OFF.
+#
+#   helm install costobs deploy/helm/costobs -f deploy/k8s-examples/values-prod.yaml
+#
+# PREREQUISITES — create these Secrets first (so passwords never live in YAML):
+#
+#   # External database connection strings:
+#   kubectl create secret generic costobs-db \
+#     --from-literal=postgres-dsn='postgres://costobs:***@pg.internal:5432/costobs?sslmode=require' \
+#     --from-literal=clickhouse-dsn='clickhouse://costobs:***@ch.internal:9000/costobs' \
+#     --from-literal=clickhouse-http-url='https://costobs:***@ch.internal:8443/costobs'
+#
+#   # OIDC client secret:
+#   kubectl create secret generic costobs-oidc \
+#     --from-literal=client-secret='***'
+#
+#   # TLS: either create costobs-tls (tls.crt/tls.key) or let cert-manager mint it
+#   #      via the annotation below.
+
+# ---- External Postgres (BYO) ----
+postgres:
+  enabled: false
+  external:
+    existingSecret: costobs-db   # provides key: postgres-dsn
+
+# ---- External ClickHouse (BYO, e.g. ClickHouse Cloud) ----
+clickhouse:
+  enabled: false
+  external:
+    existingSecret: costobs-db   # provides keys: clickhouse-dsn, clickhouse-http-url
+
+# ---- ingest: scaled + autoscaling ----
+ingest:
+  replicas: 3
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests: { cpu: 200m, memory: 128Mi }
+    limits:   { cpu: "1", memory: 512Mi }
+
+# ---- dashboard: scaled + autoscaling + OIDC ----
+dashboard:
+  replicas: 2
+  authMode: oidc
+  oidc:
+    issuer: "https://id.example.com/realms/costobs"
+    clientId: "costobs-dashboard"
+    existingSecret: costobs-oidc   # provides key: client-secret
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits:   { cpu: "1", memory: 1Gi }
+
+# ---- alertd: singleton (never scale) ----
+alertd:
+  replicas: 1
+  evalInterval: "60s"
+
+# ---- migrations still run as hooks against the external DBs ----
+migrations:
+  enabled: true
+
+# ---- production: no dev seed ----
+devSeed:
+  enabled: false
+
+# ---- ingress + TLS ----
+ingress:
+  enabled: true
+  className: nginx
+  host: costobs.example.com
+  ingestHost: ingest.costobs.example.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  tls:
+    enabled: true
+    secretName: costobs-tls

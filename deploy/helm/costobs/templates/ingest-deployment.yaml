@@ -1,0 +1,106 @@
+{{/*
+ingest — stateless telemetry ingestion API. Horizontally scalable.
+*/}}
+{{- $pgSecret := include "costobs.postgres.dsnSecret" . | fromJson -}}
+{{- $chSecret := include "costobs.clickhouse.dsnSecret" . | fromJson -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "costobs.fullname" . }}-ingest
+  labels:
+    {{- include "costobs.componentLabels" (dict "ctx" . "component" "ingest") | nindent 4 }}
+spec:
+  {{- if not .Values.ingest.autoscaling.enabled }}
+  replicas: {{ .Values.ingest.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "ingest") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "ingest") | nindent 8 }}
+      annotations:
+        {{- range $k, $v := .Values.metrics.podAnnotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        prometheus.io/port: {{ .Values.ingest.service.port | quote }}
+        prometheus.io/path: "/metrics"
+        {{- with .Values.ingest.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "costobs.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: ingest
+          image: {{ include "costobs.image" (dict "ctx" . "image" .Values.ingest.image) }}
+          imagePullPolicy: {{ include "costobs.pullPolicy" (dict "ctx" . "image" .Values.ingest.image) }}
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: COSTOBS_HTTP_ADDR
+              value: ":8080"
+            - name: COSTOBS_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret.name }}
+                  key: {{ $pgSecret.key }}
+            - name: COSTOBS_CLICKHOUSE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $chSecret.name }}
+                  key: {{ $chSecret.key }}
+            - name: COSTOBS_BATCH_MAX_EVENTS
+              value: {{ .Values.ingest.batch.maxEvents | quote }}
+            - name: COSTOBS_BATCH_MAX_INTERVAL
+              value: {{ .Values.ingest.batch.maxInterval | quote }}
+            {{- if .Values.devSeed.enabled }}
+            {{- $devSecret := include "costobs.devApiKeySecret" . | fromJson }}
+            - name: COSTOBS_DEV_SEED
+              value: "true"
+            - name: COSTOBS_DEV_ORG_SLUG
+              value: {{ .Values.devSeed.orgSlug | quote }}
+            - name: COSTOBS_DEV_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $devSecret.name }}
+                  key: {{ $devSecret.key }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.ingest.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+      {{- with .Values.ingest.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ingest.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ingest.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

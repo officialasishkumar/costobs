@@ -1,0 +1,16 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "costobs.postgres.serviceName" . }}
+  labels:
+    {{- include "costobs.componentLabels" (dict "ctx" . "component" "postgres") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: {{ .Values.postgres.service.port }}
+      targetPort: postgres
+  selector:
+    {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "postgres") | nindent 4 }}
+{{- end }}

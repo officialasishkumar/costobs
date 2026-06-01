@@ -1,0 +1,22 @@
+{{- if .Values.migrations.enabled }}
+{{/*
+ClickHouse migration SQL, embedded from this chart's migrations/clickhouse/
+dir (copies of repo-root db/clickhouse/migrations/*.sql). Mounted read-only
+into the golang-migrate hook Job at /migrations.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "costobs.fullname" . }}-ch-migrations
+  labels:
+    {{- include "costobs.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+{{- range $path, $bytes := .Files.Glob "migrations/clickhouse/*.sql" }}
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+{{- end }}

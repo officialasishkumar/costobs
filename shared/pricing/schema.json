@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://costobs.dev/schemas/pricing.schema.json",
+  "title": "CostObs Pricing File",
+  "description": "Versioned pricing data consumed by BOTH the SDK (synchronous cost calc) and the backend (reconciliation). All prices are USD. Per-token prices are per single token (NOT per 1M) to avoid scaling bugs in the SDK hot path.",
+  "type": "object",
+  "required": ["version", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "description": "Stamped onto every event as pricing_version, e.g. 2026.06" },
+    "currency": { "type": "string", "default": "USD" },
+    "models": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/model" }
+    }
+  },
+  "definitions": {
+    "model": {
+      "type": "object",
+      "required": ["provider", "model"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string" },
+        "model": { "type": "string", "description": "Exact model id, or a prefix match if `match` is `prefix`" },
+        "match": { "type": "string", "enum": ["exact", "prefix"], "default": "exact" },
+        "operation": { "type": "string", "default": "chat" },
+
+        "input_per_token":        { "type": "number", "minimum": 0 },
+        "cached_input_per_token": { "type": "number", "minimum": 0, "description": "Discounted rate for prompt-cache hits" },
+        "output_per_token":       { "type": "number", "minimum": 0 },
+        "reasoning_per_token":    { "type": "number", "minimum": 0, "description": "If absent, reasoning tokens billed at output rate" },
+        "tool_per_token":         { "type": "number", "minimum": 0 },
+
+        "image_tiers": {
+          "type": "array",
+          "description": "Per-image pricing by resolution tier (priced per tile)",
+          "items": {
+            "type": "object",
+            "required": ["per_tile"],
+            "properties": {
+              "name": { "type": "string" },
+              "per_tile": { "type": "number", "minimum": 0 },
+              "base": { "type": "number", "minimum": 0, "description": "Flat per-image base added to tile cost" }
+            }
+          }
+        },
+
+        "audio_per_second": { "type": "number", "minimum": 0 },
+
+        "batch_discount": { "type": "number", "minimum": 0, "maximum": 1, "description": "Multiplier for Batch API, e.g. 0.5 = 50% off" },
+        "finetune_surcharge": { "type": "number", "minimum": 1, "description": "Multiplier for fine-tuned variants, e.g. 1.5" }
+      }
+    }
+  }
+}

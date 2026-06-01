@@ -1,0 +1,80 @@
+CostObs has been deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Components:
+  - ingest     (telemetry API, :{{ .Values.ingest.service.port }})    replicas: {{ if .Values.ingest.autoscaling.enabled }}HPA {{ .Values.ingest.autoscaling.minReplicas }}-{{ .Values.ingest.autoscaling.maxReplicas }}{{ else }}{{ .Values.ingest.replicas }}{{ end }}
+  - dashboard  (UI + read API, :{{ .Values.dashboard.service.port }})  replicas: {{ if .Values.dashboard.autoscaling.enabled }}HPA {{ .Values.dashboard.autoscaling.minReplicas }}-{{ .Values.dashboard.autoscaling.maxReplicas }}{{ else }}{{ .Values.dashboard.replicas }}{{ end }}
+  - alertd     (periodic evaluator, singleton)        replicas: 1
+  - postgres   {{ if .Values.postgres.enabled }}bundled single-node StatefulSet{{ else }}EXTERNAL (BYO){{ end }}
+  - clickhouse {{ if .Values.clickhouse.enabled }}bundled single-node StatefulSet{{ else }}EXTERNAL (BYO){{ end }}
+
+Database migrations ran as pre-install/pre-upgrade hook Jobs (golang-migrate).
+
+----------------------------------------------------------------------
+1) Reach the dashboard
+----------------------------------------------------------------------
+{{- if .Values.ingress.enabled }}
+Ingress is enabled. Open:
+
+  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}/
+
+{{- if .Values.ingress.ingestHost }}
+The ingest API is at:
+
+  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.ingestHost }}/v1/events
+{{- else }}
+The ingest API is exposed at:
+
+  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}/v1/events
+{{- end }}
+{{- else }}
+No ingress configured. Port-forward the dashboard:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "costobs.fullname" . }}-dashboard {{ .Values.dashboard.service.port }}:{{ .Values.dashboard.service.port }}
+  # open http://localhost:{{ .Values.dashboard.service.port }}
+
+And the ingest API (to point an SDK at it):
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "costobs.fullname" . }}-ingest {{ .Values.ingest.service.port }}:{{ .Values.ingest.service.port }}
+  # COSTOBS_INGEST_URL=http://localhost:{{ .Values.ingest.service.port }}
+{{- end }}
+
+----------------------------------------------------------------------
+2) Auth
+----------------------------------------------------------------------
+{{- if eq .Values.dashboard.authMode "oidc" }}
+Dashboard auth mode: OIDC (issuer {{ .Values.dashboard.oidc.issuer }}).
+{{- else }}
+Dashboard auth mode: none (single-user / trusted-network). Anyone who can
+reach the dashboard sees org "{{ .Values.dashboard.defaultOrgSlug }}". Put it
+behind your own auth/VPN or enable OIDC for production.
+{{- end }}
+
+----------------------------------------------------------------------
+3) Dev seed / API key
+----------------------------------------------------------------------
+{{- if .Values.devSeed.enabled }}
+devSeed is ENABLED. Org "{{ .Values.devSeed.orgSlug }}" and a dev API key were
+seeded. Retrieve the key:
+
+{{- if .Values.devSeed.existingSecret }}
+  kubectl -n {{ .Release.Namespace }} get secret {{ .Values.devSeed.existingSecret }} -o jsonpath='{.data.dev-api-key}' | base64 -d; echo
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "costobs.secretName" . }} -o jsonpath='{.data.dev-api-key}' | base64 -d; echo
+{{- end }}
+
+  ** WARNING: devSeed is for demos only. Disable it (devSeed.enabled=false)
+     and rotate the key for any real deployment. **
+{{- else }}
+devSeed is disabled (correct for production). Create an org + API key through
+the dashboard / admin flow, then point your SDK at the ingest URL with that key.
+{{- end }}
+
+----------------------------------------------------------------------
+4) Send your first event (Python SDK)
+----------------------------------------------------------------------
+  pip install costobs
+  export COSTOBS_INGEST_URL=<ingest-url-from-step-1>
+  export COSTOBS_API_KEY=<api-key-from-step-3>
+  python -m costobs.examples.quickstart   # or see docs/self-hosting.md
+
+Full docs: docs/self-hosting.md, docs/architecture.md, docs/pricing.md

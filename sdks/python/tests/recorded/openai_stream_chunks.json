@@ -1,0 +1,36 @@
+[
+  {
+    "id": "chatcmpl-S1",
+    "object": "chat.completion.chunk",
+    "model": "gpt-4o-2024-08-06",
+    "choices": [{ "index": 0, "delta": { "role": "assistant", "content": "" }, "finish_reason": null }],
+    "usage": null
+  },
+  {
+    "id": "chatcmpl-S1",
+    "object": "chat.completion.chunk",
+    "model": "gpt-4o-2024-08-06",
+    "choices": [{ "index": 0, "delta": { "content": "Hello" }, "finish_reason": null }],
+    "usage": null
+  },
+  {
+    "id": "chatcmpl-S1",
+    "object": "chat.completion.chunk",
+    "model": "gpt-4o-2024-08-06",
+    "choices": [{ "index": 0, "delta": { "content": " world" }, "finish_reason": "stop" }],
+    "usage": null
+  },
+  {
+    "id": "chatcmpl-S1",
+    "object": "chat.completion.chunk",
+    "model": "gpt-4o-2024-08-06",
+    "choices": [],
+    "usage": {
+      "prompt_tokens": 50,
+      "completion_tokens": 12,
+      "total_tokens": 62,
+      "prompt_tokens_details": { "cached_tokens": 0 },
+      "completion_tokens_details": { "reasoning_tokens": 0 }
+    }
+  }
+]

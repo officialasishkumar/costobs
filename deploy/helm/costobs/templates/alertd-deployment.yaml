@@ -1,0 +1,93 @@
+{{/*
+alertd — SINGLETON periodic alert evaluator. replicas pinned to 1 and a
+Recreate strategy so two evaluators never overlap (which would double-fire
+alerts). Health/metrics on :8081. Not exposed via a Service or Ingress.
+*/}}
+{{- $pgSecret := include "costobs.postgres.dsnSecret" . | fromJson -}}
+{{- $chSecret := include "costobs.clickhouse.dsnSecret" . | fromJson -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "costobs.fullname" . }}-alertd
+  labels:
+    {{- include "costobs.componentLabels" (dict "ctx" . "component" "alertd") | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "alertd") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "alertd") | nindent 8 }}
+      annotations:
+        {{- range $k, $v := .Values.metrics.podAnnotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+        prometheus.io/port: {{ .Values.alertd.port | quote }}
+        prometheus.io/path: "/metrics"
+        {{- with .Values.alertd.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "costobs.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: alertd
+          image: {{ include "costobs.image" (dict "ctx" . "image" .Values.alertd.image) }}
+          imagePullPolicy: {{ include "costobs.pullPolicy" (dict "ctx" . "image" .Values.alertd.image) }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.alertd.port }}
+          env:
+            - name: COSTOBS_HTTP_ADDR
+              value: ":{{ .Values.alertd.port }}"
+            - name: COSTOBS_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret.name }}
+                  key: {{ $pgSecret.key }}
+            - name: COSTOBS_CLICKHOUSE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $chSecret.name }}
+                  key: {{ $chSecret.key }}
+            - name: COSTOBS_EVAL_INTERVAL
+              value: {{ .Values.alertd.evalInterval | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.alertd.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+      {{- with .Values.alertd.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.alertd.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.alertd.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

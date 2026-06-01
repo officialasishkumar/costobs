@@ -1,0 +1,14 @@
+{
+  "id": "msg_01ABC",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-20250514",
+  "content": [{ "type": "text", "text": "Sure, here is the answer." }],
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 400,
+    "output_tokens": 250,
+    "cache_read_input_tokens": 1000,
+    "cache_creation_input_tokens": 100
+  }
+}

@@ -1,0 +1,39 @@
+apiVersion: v2
+name: costobs
+description: >-
+  CostObs — fully self-hostable, offline-first AI/LLM cost observability.
+  Mode B (Kubernetes) chart: ingest API, dashboard, alertd worker, and
+  optional bundled single-node Postgres + ClickHouse. Bring-your-own external
+  managed databases are also first-class. No phone-home, no licensing checks.
+type: application
+
+# Chart version (SemVer) — bump on any chart template change.
+version: 0.1.0
+# appVersion tracks the CostObs application release this chart ships by default.
+appVersion: "0.1.0"
+
+kubeVersion: ">=1.23.0-0"
+
+keywords:
+  - llm
+  - observability
+  - cost
+  - openai
+  - anthropic
+  - self-hosted
+  - clickhouse
+
+home: https://github.com/officialasishkumar/costobs
+sources:
+  - https://github.com/officialasishkumar/costobs
+
+maintainers:
+  - name: CostObs maintainers
+
+# NOTE: We intentionally declare NO chart dependencies (no Bitnami subcharts).
+# The bundled Postgres + ClickHouse ship as our own minimal single-node
+# StatefulSets gated by .Values.postgres.enabled / .Values.clickhouse.enabled.
+# Rationale: an air-gapped / offline self-hosting story is far simpler when the
+# chart pulls zero external Helm repos at `helm install` time — every image is
+# a plain container image you can mirror into a private registry. See the long
+# comment at the top of values.yaml.

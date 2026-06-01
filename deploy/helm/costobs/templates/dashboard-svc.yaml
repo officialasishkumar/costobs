@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "costobs.fullname" . }}-dashboard
+  labels:
+    {{- include "costobs.componentLabels" (dict "ctx" . "component" "dashboard") | nindent 4 }}
+spec:
+  type: {{ .Values.dashboard.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.dashboard.service.port }}
+      targetPort: http
+  selector:
+    {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "dashboard") | nindent 4 }}

@@ -1,0 +1,84 @@
+{{- if .Values.migrations.enabled }}
+{{/*
+Postgres migration hook Job (golang-migrate). Mirrors compose `pg-migrate`:
+  migrate -path=/migrations -database=$DSN up
+
+Runs as a pre-install / pre-upgrade hook with a weight that orders it BEFORE
+the app Deployments. On a fresh install the bundled Postgres StatefulSet is a
+normal (non-hook) resource and so is not yet created; the init container polls
+the DSN host until it is reachable before migrate runs.
+*/}}
+{{- $pgSecret := include "costobs.postgres.dsnSecret" . | fromJson -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "costobs.fullname" . }}-migrate-pg
+  labels:
+    {{- include "costobs.componentLabels" (dict "ctx" . "component" "migrate-pg") | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": {{ .Values.migrations.hookDeletePolicy | quote }}
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "migrate-pg") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "costobs.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.postgres.enabled }}
+      initContainers:
+        # Wait for the bundled Postgres Service to accept TCP connections.
+        - name: wait-postgres
+          image: {{ include "costobs.image" (dict "ctx" . "image" .Values.migrations.image) }}
+          imagePullPolicy: {{ include "costobs.pullPolicy" (dict "ctx" . "image" .Values.migrations.image) }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              host={{ include "costobs.postgres.serviceName" . | quote }}
+              port={{ .Values.postgres.service.port }}
+              i=0
+              until nc -z "$host" "$port" 2>/dev/null; do
+                i=$((i+1)); if [ $i -gt 120 ]; then echo "postgres not reachable"; exit 1; fi
+                echo "waiting for postgres $host:$port..."; sleep 2
+              done
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ include "costobs.image" (dict "ctx" . "image" .Values.migrations.image) }}
+          imagePullPolicy: {{ include "costobs.pullPolicy" (dict "ctx" . "image" .Values.migrations.image) }}
+          args:
+            - "-path=/migrations"
+            - "-database=$(PG_DSN)"
+            - "up"
+          env:
+            - name: PG_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret.name }}
+                  key: {{ $pgSecret.key }}
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ include "costobs.fullname" . }}-pg-migrations
+{{- end }}

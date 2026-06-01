@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://costobs.dev/schemas/event.schema.json",
+  "title": "CostObs Telemetry Event",
+  "description": "Wire contract between SDKs and the ingest service. Field names map 1:1 to ClickHouse `events` columns. NO prompt/response bodies are ever included (principle: no prompt content storage).",
+  "type": "object",
+  "required": [
+    "request_id",
+    "ts",
+    "provider",
+    "model",
+    "operation",
+    "status",
+    "pricing_version",
+    "sdk_lang",
+    "sdk_version"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "request_id":          { "type": "string", "description": "Client-generated ULID; dedup key" },
+    "ts":                  { "type": "string", "format": "date-time", "description": "Request start, RFC3339 UTC, ms precision" },
+
+    "provider":            { "type": "string", "examples": ["openai", "anthropic", "gemini", "deepgram", "elevenlabs"] },
+    "model":               { "type": "string" },
+    "operation":           { "type": "string", "enum": ["chat", "embedding", "audio", "image", "tool", "responses"] },
+    "stream":              { "type": "boolean", "default": false },
+    "status":              { "type": "string", "enum": ["ok", "error"] },
+    "error_type":          { "type": "string", "default": "" },
+
+    "environment":         { "type": "string", "default": "" },
+    "team":                { "type": "string", "default": "" },
+    "service":             { "type": "string", "default": "" },
+    "customer_id":         { "type": "string", "default": "" },
+    "user_id":             { "type": "string", "default": "" },
+    "trace_id":            { "type": "string", "default": "" },
+    "feature":             { "type": "string", "default": "" },
+    "prompt_key":          { "type": "string", "default": "" },
+    "prompt_version":      { "type": "string", "default": "" },
+    "tags":                { "type": "object", "additionalProperties": { "type": "string" }, "default": {} },
+
+    "input_tokens":        { "type": "integer", "minimum": 0, "default": 0 },
+    "cached_input_tokens": { "type": "integer", "minimum": 0, "default": 0 },
+    "output_tokens":       { "type": "integer", "minimum": 0, "default": 0 },
+    "reasoning_tokens":    { "type": "integer", "minimum": 0, "default": 0 },
+    "tool_tokens":         { "type": "integer", "minimum": 0, "default": 0 },
+    "total_tokens":        { "type": "integer", "minimum": 0, "default": 0 },
+    "audio_seconds":       { "type": "number", "minimum": 0, "default": 0 },
+    "image_count":         { "type": "integer", "minimum": 0, "default": 0 },
+    "image_tiles":         { "type": "integer", "minimum": 0, "default": 0 },
+
+    "cost_usd":            { "type": "number", "minimum": 0, "default": 0, "description": "Computed by SDK with local pricing; backend may recompute" },
+    "pricing_version":     { "type": "string" },
+
+    "latency_ms":          { "type": "integer", "minimum": 0, "default": 0 },
+    "sdk_lang":            { "type": "string", "enum": ["python", "typescript", "go"] },
+    "sdk_version":         { "type": "string" }
+  }
+}

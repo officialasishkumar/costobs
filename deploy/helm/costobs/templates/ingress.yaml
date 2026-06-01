@@ -1,0 +1,63 @@
+{{- if .Values.ingress.enabled }}
+{{- $fullname := include "costobs.fullname" . -}}
+{{- $dashSvc := printf "%s-dashboard" $fullname -}}
+{{- $ingestSvc := printf "%s-ingest" $fullname -}}
+{{- $dashPort := .Values.dashboard.service.port -}}
+{{- $ingestPort := .Values.ingest.service.port -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "costobs.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+        {{- if .Values.ingress.ingestHost }}
+        - {{ .Values.ingress.ingestHost | quote }}
+        {{- end }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          {{- if not .Values.ingress.ingestHost }}
+          # No dedicated ingest host: expose the ingest API at /v1 on the UI host.
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $ingestSvc }}
+                port:
+                  number: {{ $ingestPort }}
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $dashSvc }}
+                port:
+                  number: {{ $dashPort }}
+    {{- if .Values.ingress.ingestHost }}
+    - host: {{ .Values.ingress.ingestHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $ingestSvc }}
+                port:
+                  number: {{ $ingestPort }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,20 @@
+{
+  "id": "chatcmpl-O3X",
+  "object": "chat.completion",
+  "created": 1717200500,
+  "model": "o3-2025-04-16",
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant", "content": "42" },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 500,
+    "completion_tokens": 2000,
+    "total_tokens": 2500,
+    "prompt_tokens_details": { "cached_tokens": 0 },
+    "completion_tokens_details": { "reasoning_tokens": 1800 }
+  }
+}

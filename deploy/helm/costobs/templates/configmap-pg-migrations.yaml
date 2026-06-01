@@ -1,0 +1,24 @@
+{{- if .Values.migrations.enabled }}
+{{/*
+Postgres migration SQL, embedded from this chart's migrations/postgres/ dir.
+These files are COPIES of repo-root db/postgres/migrations/*.sql (kept in-chart
+because Helm `.Files.Glob` cannot reach paths outside the chart directory).
+Mounted read-only into the golang-migrate hook Job at /migrations.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "costobs.fullname" . }}-pg-migrations
+  labels:
+    {{- include "costobs.labels" . | nindent 4 }}
+  annotations:
+    # Available to the pre-install/pre-upgrade migration hook.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+{{- range $path, $bytes := .Files.Glob "migrations/postgres/*.sql" }}
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+{{- end }}

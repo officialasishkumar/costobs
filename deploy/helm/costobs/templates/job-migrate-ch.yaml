@@ -1,0 +1,81 @@
+{{- if .Values.migrations.enabled }}
+{{/*
+ClickHouse migration hook Job (golang-migrate). Mirrors compose `ch-migrate`:
+  migrate -path=/migrations -database=$CH_DSN up
+where CH_DSN uses the clickhouse driver's query-param form with
+x-multi-statement=true (required by the materialized-views migration).
+*/}}
+{{- $chSecret := include "costobs.clickhouse.migrateDsnSecret" . | fromJson -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "costobs.fullname" . }}-migrate-ch
+  labels:
+    {{- include "costobs.componentLabels" (dict "ctx" . "component" "migrate-ch") | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": {{ .Values.migrations.hookDeletePolicy | quote }}
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "costobs.componentSelectorLabels" (dict "ctx" . "component" "migrate-ch") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "costobs.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.clickhouse.enabled }}
+      initContainers:
+        # Wait for the bundled ClickHouse native port to accept connections.
+        - name: wait-clickhouse
+          image: {{ include "costobs.image" (dict "ctx" . "image" .Values.migrations.image) }}
+          imagePullPolicy: {{ include "costobs.pullPolicy" (dict "ctx" . "image" .Values.migrations.image) }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              host={{ include "costobs.clickhouse.serviceName" . | quote }}
+              port={{ .Values.clickhouse.service.nativePort }}
+              i=0
+              until nc -z "$host" "$port" 2>/dev/null; do
+                i=$((i+1)); if [ $i -gt 150 ]; then echo "clickhouse not reachable"; exit 1; fi
+                echo "waiting for clickhouse $host:$port..."; sleep 2
+              done
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ include "costobs.image" (dict "ctx" . "image" .Values.migrations.image) }}
+          imagePullPolicy: {{ include "costobs.pullPolicy" (dict "ctx" . "image" .Values.migrations.image) }}
+          args:
+            - "-path=/migrations"
+            - "-database=$(CH_DSN)"
+            - "up"
+          env:
+            - name: CH_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $chSecret.name }}
+                  key: {{ $chSecret.key }}
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ include "costobs.fullname" . }}-ch-migrations
+{{- end }}
