@@ -92,6 +92,7 @@ class TelemetryQueue:
         self._stop = threading.Event()
         self._drained = threading.Event()
         self._dropped = 0
+        self._dropped_lock = threading.Lock()
         self._thread = threading.Thread(
             target=self._run, name="costobs-telemetry", daemon=True
         )
@@ -105,16 +106,19 @@ class TelemetryQueue:
         try:
             self._q.put_nowait(event_dict)
         except queue.Full:
-            self._dropped += 1
+            with self._dropped_lock:
+                self._dropped += 1
+                dropped = self._dropped
             logger.warning(
                 "costobs: telemetry queue full (max=%d), dropping event (total dropped=%d)",
                 self._q.maxsize,
-                self._dropped,
+                dropped,
             )
 
     @property
     def dropped(self) -> int:
-        return self._dropped
+        with self._dropped_lock:
+            return self._dropped
 
     # ---- consumer side (background thread) ----
 
@@ -131,7 +135,9 @@ class TelemetryQueue:
             if item is _SENTINEL:
                 # Drain everything still queued, then flush and exit.
                 self._flush(batch)
+                self._mark_done(len(batch))
                 batch = []
+                self._q.task_done()  # the sentinel itself
                 self._drain_remaining()
                 self._drained.set()
                 return
@@ -142,10 +148,17 @@ class TelemetryQueue:
             now = time.monotonic()
             if len(batch) >= self._batch_size or (batch and now >= deadline):
                 self._flush(batch)
+                self._mark_done(len(batch))
                 batch = []
                 deadline = now + self._flush_interval
             elif not batch:
                 deadline = now + self._flush_interval
+
+    def _mark_done(self, n: int) -> None:
+        """Account for n consumed items so ``Queue.unfinished_tasks`` (and thus
+        :meth:`flush`) reflects fully-shipped work, not just dequeued work."""
+        for _ in range(n):
+            self._q.task_done()
 
     def _drain_remaining(self) -> None:
         leftovers: List[Dict[str, Any]] = []
@@ -155,13 +168,16 @@ class TelemetryQueue:
             except queue.Empty:
                 break
             if item is _SENTINEL:
+                self._q.task_done()
                 continue
             leftovers.append(item)
             if len(leftovers) >= self._batch_size:
                 self._flush(leftovers)
+                self._mark_done(len(leftovers))
                 leftovers = []
         if leftovers:
             self._flush(leftovers)
+            self._mark_done(len(leftovers))
 
     def _flush(self, batch: List[Dict[str, Any]]) -> None:
         if not batch:
@@ -197,29 +213,32 @@ class TelemetryQueue:
             logger.warning("costobs: ingest returned status %s, dropping %d events", status, len(batch))
             return
 
-        self._dropped += len(batch)
+        with self._dropped_lock:
+            self._dropped += len(batch)
+            dropped = self._dropped
         logger.warning(
             "costobs: dropping %d events after %d failed attempts (total dropped=%d)",
             len(batch),
             self._max_retries,
-            self._dropped,
+            dropped,
         )
 
     # ---- lifecycle ----
 
     def flush(self, timeout: float = 5.0) -> bool:
-        """Block until the queue is empty (best effort). Returns True if drained."""
+        """Block until every enqueued event has been shipped (or dropped).
+
+        ``unfinished_tasks`` counts puts minus ``task_done`` calls; the sender
+        thread only marks items done after the batch containing them has been
+        flushed, so reaching zero means nothing is queued *or* in flight.
+        Returns True if fully drained within ``timeout``.
+        """
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if self._q.unfinished_tasks == 0 and self._q.empty():
+            if self._q.unfinished_tasks == 0:
                 return True
-            if self._q.empty():
-                # Give the sender a moment to ship the in-flight batch.
-                time.sleep(0.02)
-                if self._q.empty():
-                    return True
             time.sleep(0.01)
-        return self._q.empty()
+        return self._q.unfinished_tasks == 0
 
     def shutdown(self, timeout: float = 5.0) -> None:
         """Signal the sender to drain and stop. Idempotent."""
@@ -232,6 +251,7 @@ class TelemetryQueue:
             # Make room — drop one event so the sentinel lands.
             try:
                 self._q.get_nowait()
+                self._q.task_done()  # account for the dropped event
                 self._q.put_nowait(_SENTINEL)
             except Exception:
                 pass

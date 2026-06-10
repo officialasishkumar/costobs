@@ -39,6 +39,7 @@ class AnthropicStreamAccumulator implements StreamAccumulator {
         // message_start carries input usage; keep output from deltas.
         this.usage.input_tokens = parsed.input_tokens;
         this.usage.cached_input_tokens = parsed.cached_input_tokens;
+        this.usage.reasoning_tokens = parsed.reasoning_tokens;
       }
     } else if (etype === "message_delta") {
       const usage = read(chunk, "usage");
@@ -47,6 +48,11 @@ class AnthropicStreamAccumulator implements StreamAccumulator {
           usage,
           "output_tokens",
           this.usage.output_tokens,
+        );
+        this.usage.reasoning_tokens = readInt(
+          usage,
+          "reasoning_tokens",
+          this.usage.reasoning_tokens,
         );
       }
     }

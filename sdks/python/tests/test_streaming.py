@@ -153,3 +153,31 @@ def test_async_stream_emits_once():
     assert len(out) == len(chunks)
     assert len(cap.events) == 1
     assert cap.events[0]["output_tokens"] == 12
+
+
+def test_anthropic_stream_accumulator_keeps_reasoning_tokens():
+    """Regression: reasoning_tokens from message_start must survive into the
+    accumulated usage (previously dropped -> extended-thinking undercosted)."""
+    from costobs.adapters.anthropic import AnthropicAdapter
+
+    acc = AnthropicAdapter().new_stream_accumulator("claude-x")
+    acc.feed(
+        {
+            "type": "message_start",
+            "message": {
+                "usage": {
+                    "input_tokens": 100,
+                    "cache_read_input_tokens": 10,
+                    "cache_creation_input_tokens": 5,
+                    "reasoning_tokens": 40,
+                }
+            },
+        }
+    )
+    acc.feed({"type": "message_delta", "usage": {"output_tokens": 20}})
+    usage = acc.result()
+    assert usage.input_tokens == 105
+    assert usage.cached_input_tokens == 10
+    assert usage.reasoning_tokens == 40
+    assert usage.output_tokens == 20
+    assert usage.total_tokens == 105 + 20 + 40

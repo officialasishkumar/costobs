@@ -8,6 +8,7 @@ An adapter knows three things about a provider SDK client:
 
 from __future__ import annotations
 
+import threading
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional, Tuple, Type
 
@@ -69,7 +70,10 @@ _REGISTRY: List[ProviderAdapter] = []
 
 
 def register(adapter_cls: Type[ProviderAdapter]) -> Type[ProviderAdapter]:
-    _REGISTRY.append(adapter_cls())
+    # Idempotent: re-importing an adapter module (test reloads, forked
+    # processes) must not register the same adapter twice.
+    if not any(type(a) is adapter_cls for a in _REGISTRY):
+        _REGISTRY.append(adapter_cls())
     return adapter_cls
 
 
@@ -91,14 +95,19 @@ def all_adapters() -> List[ProviderAdapter]:
 
 
 _LOADED = False
+_LOAD_LOCK = threading.Lock()
 
 
 def _ensure_loaded() -> None:
     global _LOADED
     if _LOADED:
         return
-    _LOADED = True
-    # Import built-in adapters to populate the registry.
-    from . import anthropic as _a  # noqa: F401
-    from . import gemini as _g  # noqa: F401
-    from . import openai as _o  # noqa: F401
+    with _LOAD_LOCK:
+        if _LOADED:
+            return
+        # Import built-in adapters to populate the registry.
+        from . import anthropic as _a  # noqa: F401
+        from . import gemini as _g  # noqa: F401
+        from . import openai as _o  # noqa: F401
+
+        _LOADED = True

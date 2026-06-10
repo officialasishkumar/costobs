@@ -141,3 +141,28 @@ describe("streaming (async iterable)", () => {
     expect(cap.events).toHaveLength(1);
   });
 });
+
+describe("anthropic stream accumulator", () => {
+  it("keeps reasoning tokens from message_start (regression)", async () => {
+    const { AnthropicAdapter } = await import("../src/adapters/anthropic.js");
+    const acc = new AnthropicAdapter().newStreamAccumulator("claude-x");
+    acc.feed({
+      type: "message_start",
+      message: {
+        usage: {
+          input_tokens: 100,
+          cache_read_input_tokens: 10,
+          cache_creation_input_tokens: 5,
+          reasoning_tokens: 40,
+        },
+      },
+    });
+    acc.feed({ type: "message_delta", usage: { output_tokens: 20 } });
+    const usage = acc.result();
+    expect(usage.input_tokens).toBe(105);
+    expect(usage.cached_input_tokens).toBe(10);
+    expect(usage.reasoning_tokens).toBe(40);
+    expect(usage.output_tokens).toBe(20);
+    expect(usage.total_tokens).toBe(165);
+  });
+});

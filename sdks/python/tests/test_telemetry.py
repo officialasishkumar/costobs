@@ -118,3 +118,28 @@ def test_429_backpressure_retried():
     q.shutdown(timeout=3)
     assert sender.delivered == 1
     assert sender.calls >= 2
+
+
+def test_flush_waits_for_inflight_batch():
+    """Regression: flush() must block until in-flight batches are shipped,
+    not just until the queue looks empty."""
+    sender = _RecordingSender(delay=0.15)
+    q = TelemetryQueue("http://x", "k", batch_size=1, flush_interval=0.01, sender=sender)
+    for i in range(3):
+        q.enqueue(_ev(i))
+    assert q.flush(timeout=5) is True
+    assert sender.total == 3
+    q.shutdown(timeout=2)
+
+
+def test_flush_returns_promptly_when_drained():
+    """Regression: flush() previously burned the broken unfinished_tasks check;
+    a drained queue must return well before the timeout."""
+    sender = _RecordingSender()
+    q = TelemetryQueue("http://x", "k", batch_size=1, flush_interval=0.01, sender=sender)
+    q.enqueue(_ev(1))
+    assert q.flush(timeout=5) is True
+    start = time.monotonic()
+    assert q.flush(timeout=5) is True
+    assert time.monotonic() - start < 0.5
+    q.shutdown(timeout=2)

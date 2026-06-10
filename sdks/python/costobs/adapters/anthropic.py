@@ -37,10 +37,14 @@ class _AnthropicStreamAccumulator(StreamingUsageAccumulator):
                 # message_start carries input usage; keep output from deltas.
                 self.usage.input_tokens = parsed.input_tokens
                 self.usage.cached_input_tokens = parsed.cached_input_tokens
+                self.usage.reasoning_tokens = parsed.reasoning_tokens
         elif etype == "message_delta":
             usage = get(chunk, "usage")
             if usage is not None:
                 self.usage.output_tokens = get_int(usage, "output_tokens", self.usage.output_tokens)
+                self.usage.reasoning_tokens = get_int(
+                    usage, "reasoning_tokens", self.usage.reasoning_tokens
+                )
         self.usage.total_tokens = (
             self.usage.input_tokens + self.usage.output_tokens + self.usage.reasoning_tokens
         )
