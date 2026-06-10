@@ -97,24 +97,24 @@ export async function getCostByProvider(
 ): Promise<DimensionSlice[]> {
   const params = { org, from, to };
   assertOrgScoped(params);
-  const rows = await chQuery<{ name: string; cost_usd: string; requests: string }>(
+  const rows = await chQuery<{ name: string; total_cost: string; total_requests: string }>(
     `SELECT
         provider       AS name,
-        sum(cost_usd)  AS cost_usd,
-        sum(requests)  AS requests
+        sum(cost_usd)  AS total_cost,
+        sum(requests)  AS total_requests
      FROM cost_daily
      WHERE org_id = {org:String}
        AND date >= {from:Date}
        AND date <= {to:Date}
      GROUP BY provider
-     ORDER BY cost_usd DESC
+     ORDER BY total_cost DESC
      LIMIT 12`,
     params,
   );
   return rows.map((r) => ({
     name: r.name || '(unknown)',
-    cost_usd: Number(r.cost_usd),
-    requests: Number(r.requests),
+    cost_usd: Number(r.total_cost),
+    requests: Number(r.total_requests),
   }));
 }
 
@@ -151,18 +151,23 @@ export async function getBreakdown(
   const params: Record<string, unknown> = { org, from, to };
   assertOrgScoped(params);
 
-  // Choose the source table. If primary or secondary needs attribution
-  // dimensions (customer/feature/team) we must use cost_attr_hourly. If both
-  // are provider/model we use cost_daily. Mixing across tables is not possible
-  // from a single rollup, so when dims span both tables we fall back to the
-  // attribution table (which carries feature/team) and ignore an incompatible
-  // secondary by collapsing it — keeping the query correct and fast.
+  // Choose the source table. provider/model live in cost_daily;
+  // customer/feature/team live in cost_attr_hourly. A combination that spans
+  // both (e.g. provider × customer) exists in no rollup, so it falls back to
+  // the raw `events` table — slower, but it returns exactly what was asked
+  // for instead of silently substituting a different dimension.
+  // Aggregate aliases are deliberately distinct from source column names so
+  // ClickHouse never has to disambiguate an alias from the column it shadows.
   const dims = [primary, secondary].filter(Boolean) as BreakdownDim[];
-  const needsAttr = dims.some((d) => d in ATTR_DIMS);
   const allDaily = dims.every((d) => d in DAILY_DIMS);
+  const allAttr = dims.every((d) => d in ATTR_DIMS);
 
-  const colFor = (d: BreakdownDim): string | null =>
-    DAILY_DIMS[d] ?? ATTR_DIMS[d] ?? null;
+  type Row = {
+    primary: string;
+    secondary: string | null;
+    total_cost: string;
+    total_requests: string;
+  };
 
   if (allDaily) {
     const pCol = DAILY_DIMS[primary];
@@ -171,58 +176,64 @@ export async function getBreakdown(
       ? `${pCol} AS primary, ${sCol} AS secondary`
       : `${pCol} AS primary, NULL AS secondary`;
     const group = sCol ? `${pCol}, ${sCol}` : `${pCol}`;
-    const rows = await chQuery<{
-      primary: string;
-      secondary: string | null;
-      cost_usd: string;
-      requests: string;
-    }>(
+    const rows = await chQuery<Row>(
       `SELECT ${select},
-              sum(cost_usd) AS cost_usd,
-              sum(requests) AS requests
+              sum(cost_usd) AS total_cost,
+              sum(requests) AS total_requests
        FROM cost_daily
        WHERE org_id = {org:String}
          AND date >= {from:Date}
          AND date <= {to:Date}
        GROUP BY ${group}
-       ORDER BY cost_usd DESC
+       ORDER BY total_cost DESC
        LIMIT 200`,
       params,
     );
     return rows.map(mapBreakdown);
   }
 
-  // Attribution table path. Provider/model are NOT present here, so a secondary
-  // that needs cost_daily cannot be combined; only attr-compatible dims are kept.
-  void needsAttr;
-  const pCol = colFor(primary);
-  if (!pCol || !(primary in ATTR_DIMS)) {
-    // primary is provider/model but secondary forced attr table — re-run with
-    // primary collapsed to the attr secondary instead. Practically: swap so the
-    // attr dimension becomes primary.
-    const attrPrimary = (secondary && secondary in ATTR_DIMS ? secondary : 'feature') as BreakdownDim;
-    return getBreakdown(org, from, to, attrPrimary, null);
+  if (allAttr) {
+    const pCol = ATTR_DIMS[primary];
+    const sCol = secondary ? ATTR_DIMS[secondary] : null;
+    const select = sCol
+      ? `${pCol} AS primary, ${sCol} AS secondary`
+      : `${pCol} AS primary, NULL AS secondary`;
+    const group = sCol ? `${pCol}, ${sCol}` : `${pCol}`;
+    const rows = await chQuery<Row>(
+      `SELECT ${select},
+              sum(cost_usd) AS total_cost,
+              sum(requests) AS total_requests
+       FROM cost_attr_hourly
+       WHERE org_id = {org:String}
+         AND hour >= toDateTime({from:Date})
+         AND hour <  toDateTime({to:Date}) + INTERVAL 1 DAY
+       GROUP BY ${group}
+       ORDER BY total_cost DESC
+       LIMIT 200`,
+      params,
+    );
+    return rows.map(mapBreakdown);
   }
-  const sCol = secondary && secondary in ATTR_DIMS ? ATTR_DIMS[secondary] : null;
+
+  // Mixed dims: raw events carries every dimension. Bounded by the date
+  // range, org filter, and LIMIT; acceptable for an explicit drill-down.
+  const colFor = (d: BreakdownDim): string => DAILY_DIMS[d] ?? ATTR_DIMS[d]!;
+  const pCol = colFor(primary);
+  const sCol = secondary ? colFor(secondary) : null;
   const select = sCol
     ? `${pCol} AS primary, ${sCol} AS secondary`
     : `${pCol} AS primary, NULL AS secondary`;
   const group = sCol ? `${pCol}, ${sCol}` : `${pCol}`;
-  const rows = await chQuery<{
-    primary: string;
-    secondary: string | null;
-    cost_usd: string;
-    requests: string;
-  }>(
+  const rows = await chQuery<Row>(
     `SELECT ${select},
-            sum(cost_usd) AS cost_usd,
-            sum(requests) AS requests
-     FROM cost_attr_hourly
+            sum(cost_usd) AS total_cost,
+            count()       AS total_requests
+     FROM events
      WHERE org_id = {org:String}
-       AND hour >= toDateTime({from:Date})
-       AND hour <  toDateTime({to:Date}) + INTERVAL 1 DAY
+       AND ts >= toDateTime({from:Date})
+       AND ts <  toDateTime({to:Date}) + INTERVAL 1 DAY
      GROUP BY ${group}
-     ORDER BY cost_usd DESC
+     ORDER BY total_cost DESC
      LIMIT 200`,
     params,
   );
@@ -232,14 +243,14 @@ export async function getBreakdown(
 function mapBreakdown(r: {
   primary: string;
   secondary: string | null;
-  cost_usd: string;
-  requests: string;
+  total_cost: string;
+  total_requests: string;
 }): BreakdownRow {
   return {
     primary: r.primary || '(none)',
     secondary: r.secondary === null ? null : r.secondary || '(none)',
-    cost_usd: Number(r.cost_usd),
-    requests: Number(r.requests),
+    cost_usd: Number(r.total_cost),
+    requests: Number(r.total_requests),
   };
 }
 
@@ -411,41 +422,44 @@ export async function getPromptComparison(
 ): Promise<PromptVersionRow[]> {
   const params = { org, promptKey, from, to };
   assertOrgScoped(params);
+  // Aliases must NOT shadow the aggregate-state column names (requests,
+  // out_tokens, latency_p95): ClickHouse would resolve the alias instead of
+  // the column inside the *Merge argument and reject the query.
   const rows = await chQuery<{
     prompt_version: string;
     model: string;
-    cost_usd: string;
-    requests: string;
-    out_tokens: string;
-    latency_p95: string;
+    total_cost: string;
+    total_requests: string;
+    total_out_tokens: string;
+    latency_p95_ms: string;
   }>(
     `SELECT
         prompt_version,
         model,
-        sumMerge(cost_state)               AS cost_usd,
-        countMerge(requests)               AS requests,
-        sumMerge(out_tokens)               AS out_tokens,
-        quantileMerge(0.95)(latency_p95)   AS latency_p95
+        sumMerge(cost_state)               AS total_cost,
+        countMerge(requests)               AS total_requests,
+        sumMerge(out_tokens)               AS total_out_tokens,
+        quantileMerge(0.95)(latency_p95)   AS latency_p95_ms
      FROM prompt_version_daily
      WHERE org_id = {org:String}
        AND prompt_key = {promptKey:String}
        AND date >= {from:Date}
        AND date <= {to:Date}
      GROUP BY prompt_version, model
-     ORDER BY cost_usd DESC`,
+     ORDER BY total_cost DESC`,
     params,
   );
   return rows.map((r) => {
-    const cost = Number(r.cost_usd);
-    const reqs = Number(r.requests);
+    const cost = Number(r.total_cost);
+    const reqs = Number(r.total_requests);
     return {
       prompt_version: r.prompt_version || '(none)',
       model: r.model || '(none)',
       cost_usd: cost,
       requests: reqs,
       cost_per_request: reqs > 0 ? cost / reqs : 0,
-      out_tokens: Number(r.out_tokens),
-      latency_p95: Number(r.latency_p95),
+      out_tokens: Number(r.total_out_tokens),
+      latency_p95: Number(r.latency_p95_ms),
     };
   });
 }
@@ -467,7 +481,7 @@ export async function getDailyTotalsForForecast(
         sum(requests)  AS requests
      FROM cost_daily
      WHERE org_id = {org:String}
-       AND date >= today() - {days:UInt32}
+       AND date >  today() - {days:UInt32}
        AND date <= today()
      GROUP BY date
      ORDER BY date ASC`,

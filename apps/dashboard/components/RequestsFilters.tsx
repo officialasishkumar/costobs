@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button, Select, SelectItem, TextInput } from '@tremor/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RANGE_OPTIONS } from '@/lib/range';
 
 export interface RequestsFilterValues {
@@ -20,6 +20,13 @@ export function RequestsFilters({ initial }: { initial: RequestsFilterValues }) 
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [v, setV] = useState<RequestsFilterValues>(initial);
+
+  // Re-sync when the URL-derived filters change (e.g. back/forward
+  // navigation); useState only reads `initial` on first mount.
+  useEffect(() => {
+    setV(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(initial)]);
 
   function apply() {
     const params = new URLSearchParams(searchParams.toString());

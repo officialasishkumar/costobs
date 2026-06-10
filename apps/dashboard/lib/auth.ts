@@ -5,11 +5,11 @@ import 'server-only';
 // COSTOBS_AUTH_MODE:
 //   - "none" (default): single-user dev. No login. Org comes from
 //     COSTOBS_DEFAULT_ORG_SLUG (default "default"), user is synthetic.
-//   - "oidc": self-hosted SSO. We expose a stub here so there is no hard
-//     dependency on any SaaS auth provider. A real deployment would wire
+//   - "oidc": self-hosted SSO. We expose a seam here so there is no hard
+//     dependency on any SaaS auth provider. A real deployment must wire
 //     NextAuth/Auth.js or a custom OIDC handler and resolve the session
-//     here; until then it falls back to the default org so the app still
-//     renders rather than crashing.
+//     here; until that is done, "oidc" mode fails closed instead of
+//     silently serving the default org to unauthenticated visitors.
 
 export type AuthMode = 'none' | 'oidc';
 
@@ -50,15 +50,16 @@ export async function auth(): Promise<Session> {
 }
 
 /**
- * Stubbed OIDC resolution. Wire your provider here. Kept fully optional:
- * if no provider/session is configured we degrade to the default org so the
- * `none` path and the build never depend on OIDC being set up.
+ * OIDC resolution seam. Wire your provider here (NextAuth/Auth.js
+ * getServerSession or custom token verification mapping the subject to
+ * users/memberships in Postgres). Until wired, this FAILS CLOSED: serving
+ * the default org to every unauthenticated visitor would be an auth bypass.
  */
 async function resolveOidcSession(): Promise<Session> {
-  // TODO: integrate NextAuth/Auth.js (getServerSession) or a custom OIDC
-  // token verification and map the subject -> users/memberships in Postgres.
-  return {
-    orgSlug: defaultOrgSlug(),
-    user: SYNTHETIC_USER,
-  };
+  throw new Error(
+    'COSTOBS_AUTH_MODE=oidc is set but no OIDC provider is wired in ' +
+      'lib/auth.ts (resolveOidcSession). Refusing to serve data without ' +
+      'authentication — integrate your OIDC provider or set ' +
+      'COSTOBS_AUTH_MODE=none for single-user mode.',
+  );
 }
