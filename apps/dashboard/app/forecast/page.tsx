@@ -26,7 +26,7 @@ export default async function ForecastPage({
     <PageHeader
       eyebrow="05 / forecast"
       title="Spend trajectory"
-      description={`Linear least-squares trend on the last ${HISTORY_DAYS} days, projected ${HORIZON_DAYS} days forward.`}
+      description={`Holt-Winters weekly-seasonal + linear least-squares fits on the last ${HISTORY_DAYS} days, projected ${HORIZON_DAYS} days forward. Fully offline, closed-form math.`}
     >
       <ForecastToggle showExponential={showExponential} />
     </PageHeader>
@@ -43,12 +43,13 @@ export default async function ForecastPage({
       .filter((p) => p.actual === null)
       .reduce((s, p) => s + (p.linear ?? 0), 0);
 
+    const hasSeasonal = result.seasonal !== null;
     const stats = [
       {
-        label: 'Month-end estimate · linear',
-        value: fmtUsd(result.monthEndEstimate),
+        label: hasSeasonal ? 'Month-end estimate · seasonal' : 'Month-end estimate · linear',
+        value: fmtUsd(result.monthEndEstimateSeasonal ?? result.monthEndEstimate),
         accent: true,
-        sub: null as string | null,
+        sub: hasSeasonal ? `linear says ${fmtUsd(result.monthEndEstimate)}` : (null as string | null),
       },
       {
         label: `Next ${HORIZON_DAYS}d projected spend`,
@@ -57,10 +58,11 @@ export default async function ForecastPage({
         sub: null,
       },
       {
-        label: 'Trend · linear R²',
-        value: result.linear.r2.toFixed(3),
+        label: 'Fit quality · R²',
+        value: (hasSeasonal ? result.seasonal!.r2 : result.linear.r2).toFixed(3),
         accent: false,
         sub:
+          `${hasSeasonal ? `seasonal · linear R² ${result.linear.r2.toFixed(3)} · ` : ''}` +
           `slope ${fmtUsd(result.linear.slope)} / day` +
           (result.exponential ? ` · exp R² ${result.exponential.r2.toFixed(3)}` : ''),
       },

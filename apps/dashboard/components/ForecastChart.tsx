@@ -11,19 +11,30 @@ export function ForecastChart({
   result: ForecastResult;
   showExponential: boolean;
 }) {
+  const hasSeasonal = result.seasonal !== null;
   const data = result.points.map((p) => ({
     date: p.date,
     Actual: p.actual,
     'Linear projection': p.linear,
+    ...(hasSeasonal && p.seasonal !== null ? { 'Seasonal (Holt-Winters)': p.seasonal } : {}),
     ...(showExponential && p.exponential !== null
       ? { 'Exponential projection': p.exponential }
       : {}),
   }));
 
-  const categories =
-    showExponential && result.exponential
-      ? ['Actual', 'Linear projection', 'Exponential projection']
-      : ['Actual', 'Linear projection'];
+  const categories = [
+    'Actual',
+    'Linear projection',
+    ...(hasSeasonal ? ['Seasonal (Holt-Winters)'] : []),
+    ...(showExponential && result.exponential ? ['Exponential projection'] : []),
+  ];
+
+  const colors = [
+    'amber',
+    'cyan',
+    ...(hasSeasonal ? ['emerald'] : []),
+    ...(showExponential && result.exponential ? ['rose'] : []),
+  ];
 
   return (
     <section className="panel panel--ticked reveal reveal-4 p-5">
@@ -38,7 +49,7 @@ export function ForecastChart({
         data={data}
         index="date"
         categories={categories}
-        colors={['amber', 'cyan', 'rose']}
+        colors={colors}
         valueFormatter={fmtUsd}
         yAxisWidth={72}
         connectNulls

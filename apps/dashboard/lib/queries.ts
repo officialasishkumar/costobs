@@ -702,6 +702,9 @@ export async function getDailyTotalsForForecast(
 ): Promise<DailySpendPoint[]> {
   const params = { org, days };
   assertOrgScoped(params);
+  // Complete days only: today is partial and would poison every fit (the
+  // trailing "drop" reads as a crash to both the linear slope and the
+  // Holt-Winters level/trend).
   const rows = await chQuery<{ day: string; total_cost: string; total_requests: string }>(
     `SELECT
         toString(date) AS day,
@@ -709,8 +712,8 @@ export async function getDailyTotalsForForecast(
         sum(requests)  AS total_requests
      FROM cost_daily
      WHERE org_id = {org:String}
-       AND date >  today() - {days:UInt32}
-       AND date <= today()
+       AND date >= today() - {days:UInt32}
+       AND date <  today()
      GROUP BY date
      ORDER BY date ASC`,
     params,
