@@ -82,7 +82,9 @@ def wrap(
         raise ValueError(
             "costobs.wrap: could not detect provider for client of type "
             f"{type(client).__module__}.{type(client).__qualname__}. "
-            "Supported: openai, anthropic, gemini (google-genai)."
+            "Supported: openai (incl. xAI/Together/Fireworks/OpenRouter/Groq/"
+            "DeepSeek/Mistral via base_url), anthropic, gemini (google-genai), "
+            "litellm (pass the module)."
         )
 
     base_url, key = _resolve_ingest(ingest_url, api_key)
@@ -102,7 +104,7 @@ def wrap(
     pricing = PricingEngine.default()
     queue = _get_queue(base_url, key)
 
-    recorder = _Recorder(adapter, resolver, pricing, queue)
+    recorder = _Recorder(adapter, resolver, pricing, queue, provider=adapter.provider_for(client))
     return ObservedClient(client, recorder)
 
 

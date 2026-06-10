@@ -8,8 +8,12 @@ between concurrent tasks/threads.
 from __future__ import annotations
 
 import contextlib
+import functools
+import inspect
 from contextvars import ContextVar
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Callable, Dict, Iterator, Optional, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 _REQUEST_CTX: ContextVar[Dict[str, Any]] = ContextVar("costobs_request_ctx", default={})
 
@@ -53,6 +57,52 @@ def request_context(
         yield merged
     finally:
         _REQUEST_CTX.reset(token)
+
+
+def trace(
+    metadata: Optional[Dict[str, Any]] = None,
+    *,
+    customer_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    trace_id: Optional[str] = None,
+    **extra: Any,
+) -> Callable[[F], F]:
+    """Decorator: every observed call inside the function carries this metadata.
+
+    Works on sync and async functions; nests with (and is overridden by)
+    :func:`request_context` and per-call kwargs::
+
+        @costobs.trace(feature="search", team="discovery")
+        def handle_query(q): ...
+
+        @costobs.trace({"customer_id": "cust-42"})
+        async def summarize(doc): ...
+    """
+    merged_extra = dict(metadata or {})
+    merged_extra.update(extra)
+
+    def decorator(fn: F) -> F:
+        if inspect.iscoroutinefunction(fn):
+
+            @functools.wraps(fn)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                async with async_request_context(
+                    customer_id=customer_id, user_id=user_id, trace_id=trace_id, **merged_extra
+                ):
+                    return await fn(*args, **kwargs)
+
+            return async_wrapper  # type: ignore[return-value]
+
+        @functools.wraps(fn)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            with request_context(
+                customer_id=customer_id, user_id=user_id, trace_id=trace_id, **merged_extra
+            ):
+                return fn(*args, **kwargs)
+
+        return sync_wrapper  # type: ignore[return-value]
+
+    return decorator
 
 
 @contextlib.asynccontextmanager

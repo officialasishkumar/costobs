@@ -38,7 +38,7 @@ def _utc_now_iso() -> str:
 class _Recorder:
     """Captures shared dependencies for a wrapped client tree."""
 
-    __slots__ = ("adapter", "resolver", "pricing", "queue")
+    __slots__ = ("adapter", "resolver", "pricing", "queue", "provider")
 
     def __init__(
         self,
@@ -46,11 +46,15 @@ class _Recorder:
         resolver: MetadataResolver,
         pricing: PricingEngine,
         queue: TelemetryQueue,
+        provider: str = "",
     ):
         self.adapter = adapter
         self.resolver = resolver
         self.pricing = pricing
         self.queue = queue
+        # Resolved at wrap time (may differ from adapter.name for
+        # OpenAI-compatible providers reached via base_url).
+        self.provider = provider or adapter.name
 
 
 class ObservedClient:
@@ -198,7 +202,11 @@ def _emit(
     """Build the event and enqueue it. Off the hot path of the provider call."""
     latency_ms = int((time.perf_counter() - start) * 1000)
     meta = recorder.resolver.merge(call_meta)
-    provider = recorder.adapter.name
+    adapter = recorder.adapter
+    provider = adapter.provider_for_call(model, call_meta) or recorder.provider
+    # Normalized for both pricing and the stamped event (strips routing
+    # prefixes like LiteLLM's "anthropic/claude-...").
+    model = adapter.normalize_model(model)
 
     cost = recorder.pricing.cost(usage, provider, model, operation)
 

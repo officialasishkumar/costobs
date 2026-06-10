@@ -63,6 +63,19 @@ class OpenAIStreamAccumulator implements StreamAccumulator {
   }
 }
 
+/** baseURL host (substring) -> provider name, for OpenAI-compatible APIs. */
+const HOST_PROVIDERS: ReadonlyArray<readonly [string, string]> = [
+  ["api.x.ai", "xai"],
+  ["api.together.xyz", "together"],
+  ["api.fireworks.ai", "fireworks"],
+  ["openrouter.ai", "openrouter"],
+  ["api.groq.com", "groq"],
+  ["api.deepseek.com", "deepseek"],
+  ["api.mistral.ai", "mistral"],
+  ["generativelanguage.googleapis.com", "gemini"],
+  ["openai.azure.com", "azure-openai"],
+];
+
 class OpenAIAdapter implements ProviderAdapter {
   readonly name = "openai";
   readonly terminalPaths: readonly Path[] = [
@@ -70,6 +83,16 @@ class OpenAIAdapter implements ProviderAdapter {
     ["responses", "create"],
     ["embeddings", "create"],
   ];
+
+  providerFor(client: unknown): string {
+    // Many providers expose OpenAI-compatible APIs through this SDK via
+    // baseURL. Stamp the real provider so attribution isn't all "openai".
+    const baseUrl = String(read(client, "baseURL") ?? "");
+    for (const [host, provider] of HOST_PROVIDERS) {
+      if (baseUrl.includes(host)) return provider;
+    }
+    return this.name;
+  }
 
   detect(client: unknown): boolean {
     if (client === null || typeof client !== "object") return false;

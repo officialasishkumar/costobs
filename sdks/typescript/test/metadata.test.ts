@@ -88,3 +88,24 @@ describe("AsyncLocalStorage propagation", () => {
     expect(results).toEqual({ a: "a", b: "b", c: "c" });
   });
 });
+
+describe("openai-compatible provider detection", () => {
+  it("maps baseURL hosts to provider names", async () => {
+    const { OpenAIAdapter } = await import("../src/adapters/openai.js");
+    const adapter = new OpenAIAdapter();
+    const cases: Array<[string, string]> = [
+      ["https://api.x.ai/v1", "xai"],
+      ["https://api.together.xyz/v1", "together"],
+      ["https://api.fireworks.ai/inference/v1", "fireworks"],
+      ["https://openrouter.ai/api/v1", "openrouter"],
+      ["https://api.groq.com/openai/v1", "groq"],
+      ["https://api.deepseek.com/v1", "deepseek"],
+      ["https://api.mistral.ai/v1", "mistral"],
+      ["https://myorg.openai.azure.com/", "azure-openai"],
+      ["https://api.openai.com/v1", "openai"],
+    ];
+    for (const [url, expected] of cases) {
+      expect(adapter.providerFor({ baseURL: url })).toBe(expected);
+    }
+  });
+});

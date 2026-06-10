@@ -31,6 +31,11 @@ export interface Recorder {
   resolver: MetadataResolver;
   pricing: PricingEngine;
   queue: Pick<TelemetryQueue, "enqueue">;
+  /**
+   * Provider name resolved at wrap time; may differ from adapter.name for
+   * OpenAI-compatible providers reached via baseURL. Defaults to adapter.name.
+   */
+  provider?: string;
 }
 
 function utcNowIso(): string {
@@ -275,8 +280,15 @@ function emit(
 ): void {
   const latencyMs = Math.round(performanceNow() - state.start);
   const meta = recorder.resolver.merge(state.callMeta);
-  const provider = recorder.adapter.name;
-  const cost = recorder.pricing.cost(usage, provider, state.model, {
+  const adapter = recorder.adapter;
+  const provider =
+    adapter.providerForCall?.(state.model, {}) ??
+    recorder.provider ??
+    adapter.name;
+  // Normalized for both pricing and the stamped event (strips routing
+  // prefixes like "anthropic/claude-...").
+  const model = adapter.normalizeModel?.(state.model) ?? state.model;
+  const cost = recorder.pricing.cost(usage, provider, model, {
     operation: state.operation,
   });
 
@@ -284,7 +296,7 @@ function emit(
     request_id: state.requestId,
     ts: state.ts,
     provider,
-    model: state.model,
+    model,
     operation: state.operation,
     stream: state.streaming,
     status: opts.status ?? "ok",

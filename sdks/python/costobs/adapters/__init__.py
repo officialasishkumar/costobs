@@ -42,6 +42,25 @@ class ProviderAdapter(ABC):
     def detect(self, client: Any) -> bool:
         """Return True if ``client`` is an instance of this provider's SDK."""
 
+    def provider_for(self, client: Any) -> str:
+        """Resolve the provider name stamped onto events for this client.
+
+        Overridden by adapters whose SDK fronts multiple providers (e.g. the
+        OpenAI client pointed at xAI/Together/OpenRouter via ``base_url``).
+        """
+        return self.name
+
+    def provider_for_call(self, model: str, kwargs: dict) -> Optional[str]:
+        """Per-call provider override (e.g. LiteLLM routing by model prefix).
+
+        Return None to use the wrap-time provider.
+        """
+        return None
+
+    def normalize_model(self, model: str) -> str:
+        """Strip routing prefixes before pricing lookup (e.g. 'openai/gpt-4o')."""
+        return model
+
     @abstractmethod
     def operation_for(self, path: Tuple[str, ...]) -> str:
         """Map a terminal path to an Event ``operation`` value."""
@@ -108,6 +127,7 @@ def _ensure_loaded() -> None:
         # Import built-in adapters to populate the registry.
         from . import anthropic as _a  # noqa: F401
         from . import gemini as _g  # noqa: F401
+        from . import litellm as _l  # noqa: F401
         from . import openai as _o  # noqa: F401
 
         _LOADED = True

@@ -50,6 +50,18 @@ export interface ProviderAdapter {
    * streaming. Must not mutate the input; returns a copy when changed.
    */
   prepareStreamOptions(options: Record<string, unknown>): Record<string, unknown>;
+
+  /**
+   * Resolve the provider name stamped onto events for this client. Implement
+   * when one SDK fronts multiple providers (OpenAI client + custom baseURL).
+   */
+  providerFor?(client: unknown): string;
+
+  /** Per-call provider override (router SDKs). Null = wrap-time provider. */
+  providerForCall?(model: string, options: Record<string, unknown>): string | null;
+
+  /** Strip routing prefixes before pricing/stamping (e.g. "openai/gpt-4o"). */
+  normalizeModel?(model: string): string;
 }
 
 /** Shared helpers for reading values off provider response objects. */
