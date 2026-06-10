@@ -1,5 +1,8 @@
 # CostObs
 
+[![CI](https://github.com/officialasishkumar/costobs/actions/workflows/ci.yml/badge.svg)](https://github.com/officialasishkumar/costobs/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 **Open-source, fully self-hostable AI/LLM cost observability — with per-request
 attribution.** CostObs tells you exactly what every LLM/provider call costs and
 attributes it to the dimensions you care about (customer, feature, team,
@@ -15,6 +18,8 @@ file and ships telemetry **asynchronously, off your request hot path** —
 observing cost never adds latency or a failure mode to your product traffic.
 Run the whole thing on a laptop with `docker compose up`, or on Kubernetes in
 your own (even air-gapped) cluster.
+
+![CostObs dashboard — spend overview](docs/assets/dashboard.png)
 
 ## Features
 
