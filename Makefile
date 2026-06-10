@@ -26,6 +26,7 @@ test: sdk-test ingest-test
 
 sdk-test:
 	cd sdks/python && python -m pytest -q
+	cd sdks/go && go test ./...
 
 ingest-test:
 	cd services/ingest && go test ./...
@@ -46,6 +47,7 @@ fmt:
 sync-pricing:
 	cp shared/pricing/pricing-v2026.06.yaml sdks/python/costobs/data/
 	cp shared/pricing/pricing-v2026.06.yaml sdks/typescript/src/data/
+	cp shared/pricing/pricing-v2026.06.yaml sdks/go/data/
 
 # populate the dashboard with synthetic demo data (no provider key needed)
 demo-data:
