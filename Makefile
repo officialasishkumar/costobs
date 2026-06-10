@@ -46,3 +46,7 @@ fmt:
 sync-pricing:
 	cp shared/pricing/pricing-v2026.06.yaml sdks/python/costobs/data/
 	cp shared/pricing/pricing-v2026.06.yaml sdks/typescript/src/data/
+
+# populate the dashboard with synthetic demo data (no provider key needed)
+demo-data:
+	./scripts/seed-demo.sh

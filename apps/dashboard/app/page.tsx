@@ -11,6 +11,7 @@ import { KpiCards } from '@/components/KpiCards';
 import { SpendChart } from '@/components/SpendChart';
 import { ProviderDonut } from '@/components/ProviderDonut';
 import { TopModels } from '@/components/TopModels';
+import { GettingStarted } from '@/components/GettingStarted';
 import { RangeSelect } from '@/components/RangeSelect';
 import { PageHeader } from '@/components/PageHeader';
 import { QueryError } from '@/components/DataState';
@@ -49,6 +50,17 @@ export default async function OverviewPage({
       getCostByModel(org, range.from, range.to),
       getMoMTotals(org),
     ]);
+
+    // First run: no events for this org yet — show guided setup instead of
+    // empty charts.
+    if (totals.requests === 0) {
+      return (
+        <div className="space-y-6">
+          {header}
+          <GettingStarted />
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6">

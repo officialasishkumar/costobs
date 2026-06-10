@@ -33,10 +33,30 @@ export type QueryParams = Record<string, unknown>;
  */
 export async function chQuery<T>(sql: string, params: QueryParams = {}): Promise<T[]> {
   const ch = getClickHouse();
-  const rs = await ch.query({
-    query: sql,
-    query_params: params,
-    format: 'JSONEachRow',
-  });
-  return rs.json<T>();
+  try {
+    const rs = await ch.query({
+      query: sql,
+      query_params: params,
+      format: 'JSONEachRow',
+    });
+    return rs.json<T>();
+  } catch (err) {
+    // Normalize to a plain Error: the client throws AggregateError with an
+    // EMPTY message on connection failures, which Next 15's RSC stream
+    // serializer cannot encode (the page 500s instead of rendering our
+    // QueryError fallback).
+    throw new Error(`ClickHouse query failed: ${describeError(err)}`);
+  }
+}
+
+function describeError(err: unknown): string {
+  if (err instanceof AggregateError) {
+    const parts = err.errors.map((e) =>
+      e instanceof Error ? e.message : String(e),
+    );
+    const code = (err as { code?: string }).code;
+    return [err.message, code, ...parts].filter(Boolean).join('; ') || 'connection failed';
+  }
+  if (err instanceof Error) return err.message || err.name;
+  return String(err);
 }
