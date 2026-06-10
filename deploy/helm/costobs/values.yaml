@@ -128,6 +128,41 @@ dashboard:
 # (it is a timer-driven loop, not a request server; running >1 would double-fire
 # alerts). Listens on :8081 for health/metrics only. NOT autoscaled.
 # -----------------------------------------------------------------------------
+# billsyncd — opt-in billing sync (the ONLY outbound-calling component).
+# Pulls actual billed cost from provider admin APIs into billed_daily for the
+# dashboard's reconciliation page. Fetchers only run for providers with keys.
+billsyncd:
+  enabled: true
+  image:
+    repository: ghcr.io/officialasishkumar/costobs-billsyncd
+    tag: ""
+    pullPolicy: ""
+  # -- Pinned to 1. Do not raise: billsyncd is a singleton periodic worker.
+  replicas: 1
+  orgSlug: "default"
+  syncInterval: "6h"
+  lookbackDays: 30
+  # Health/metrics port (COSTOBS_HTTP_ADDR defaults to :8082).
+  port: 8082
+  # Provide keys inline (rendered into a chart-managed Secret) ...
+  billingKeys:
+    openaiAdminKey: ""
+    anthropicAdminKey: ""
+  # ... or reference an existing Secret with keys `openai-admin-key` and
+  # `anthropic-admin-key` (recommended for real deployments).
+  existingBillingKeysSecret: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 alertd:
   image:
     repository: ghcr.io/officialasishkumar/costobs-alertd

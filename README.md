@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/officialasishkumar/costobs/actions/workflows/ci.yml/badge.svg)](https://github.com/officialasishkumar/costobs/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Site](https://img.shields.io/badge/site-officialasishkumar.github.io%2Fcostobs-FFB224)](https://officialasishkumar.github.io/costobs/)
 
 **Open-source, fully self-hostable AI/LLM cost observability — with per-request
 attribution.** CostObs tells you exactly what every LLM/provider call costs and

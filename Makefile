@@ -52,3 +52,8 @@ sync-pricing:
 # populate the dashboard with synthetic demo data (no provider key needed)
 demo-data:
 	./scripts/seed-demo.sh
+
+# copy canonical db/ migrations into the Helm chart bundle
+sync-chart:
+	cp db/clickhouse/migrations/*.sql deploy/helm/costobs/migrations/clickhouse/
+	cp db/postgres/migrations/*.sql deploy/helm/costobs/migrations/postgres/
