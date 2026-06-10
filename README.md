@@ -2,10 +2,11 @@
 
 [![CI](https://github.com/officialasishkumar/costobs/actions/workflows/ci.yml/badge.svg)](https://github.com/officialasishkumar/costobs/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Site](https://img.shields.io/badge/site-officialasishkumar.github.io%2Fcostobs-FFB224)](https://officialasishkumar.github.io/costobs/)
+[![Website](https://img.shields.io/badge/website-costobs.vercel.app-FFB224)](https://costobs.vercel.app)
+[![Docs](https://img.shields.io/badge/docs-costobs.vercel.app%2Fdocs-56C2E6)](https://costobs.vercel.app/docs.html)
 
 **Open-source, fully self-hostable AI/LLM cost observability — with per-request
-attribution.** CostObs tells you exactly what every LLM/provider call costs and
+attribution.** Website: **[costobs.vercel.app](https://costobs.vercel.app)** CostObs tells you exactly what every LLM/provider call costs and
 attributes it to the dimensions you care about (customer, feature, team,
 environment, prompt version), so you can answer "what is this costing us, and
 where is it going?" — without shipping a byte of your data to anyone else.

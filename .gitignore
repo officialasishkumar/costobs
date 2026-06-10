@@ -28,3 +28,4 @@ out/
 .vscode/
 docker-compose.override.yml
 .playwright-mcp/
+.vercel/
