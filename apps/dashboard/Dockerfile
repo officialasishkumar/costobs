@@ -5,7 +5,9 @@
 # ---- deps ----
 FROM node:24-alpine AS deps
 WORKDIR /app
-COPY apps/dashboard/package.json apps/dashboard/package-lock.json* ./
+# .npmrc carries legacy-peer-deps (Tremor 3.x declares a React 18 peer but
+# runs fine on React 19); without it npm ci fails on ERESOLVE.
+COPY apps/dashboard/package.json apps/dashboard/package-lock.json* apps/dashboard/.npmrc ./
 RUN npm ci || npm install
 
 # ---- builder ----
