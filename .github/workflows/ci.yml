@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [ingest, alertd]
+        service: [ingest, alertd, billsyncd]
     defaults:
       run:
         working-directory: services/${{ matrix.service }}

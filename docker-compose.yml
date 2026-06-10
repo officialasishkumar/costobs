@@ -100,6 +100,21 @@ services:
       COSTOBS_POSTGRES_DSN: "postgres://${POSTGRES_USER:-costobs}:${POSTGRES_PASSWORD:-costobs}@postgres:5432/${POSTGRES_DB:-costobs}?sslmode=disable"
       COSTOBS_EVAL_INTERVAL: "60s"
 
+  billsyncd:
+    build:
+      context: .
+      dockerfile: services/billsyncd/Dockerfile
+    depends_on:
+      ch-migrate: { condition: service_completed_successfully }
+    environment:
+      COSTOBS_CLICKHOUSE_DSN: "clickhouse://${CLICKHOUSE_USER:-costobs}:${CLICKHOUSE_PASSWORD:-costobs}@clickhouse:9000/${CLICKHOUSE_DB:-costobs}"
+      COSTOBS_ORG_SLUG: "${COSTOBS_DEV_ORG_SLUG:-default}"
+      COSTOBS_SYNC_INTERVAL: "6h"
+      # Opt-in: billsyncd only calls provider APIs when these are set.
+      COSTOBS_BILLING_OPENAI_ADMIN_KEY: "${COSTOBS_BILLING_OPENAI_ADMIN_KEY:-}"
+      COSTOBS_BILLING_ANTHROPIC_ADMIN_KEY: "${COSTOBS_BILLING_ANTHROPIC_ADMIN_KEY:-}"
+    ports: ["8082:8082"]
+
   dashboard:
     build:
       context: .
