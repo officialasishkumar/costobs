@@ -6,7 +6,9 @@
 [![Docs](https://img.shields.io/badge/docs-costobs.vercel.app%2Fdocs-56C2E6)](https://costobs.vercel.app/docs.html)
 
 **Open-source, fully self-hostable AI/LLM cost observability — with per-request
-attribution.** Website: **[costobs.vercel.app](https://costobs.vercel.app)** CostObs tells you exactly what every LLM/provider call costs and
+attribution.** Website: **[costobs.vercel.app](https://costobs.vercel.app)**
+
+CostObs tells you exactly what every LLM/provider call costs and
 attributes it to the dimensions you care about (customer, feature, team,
 environment, prompt version), so you can answer "what is this costing us, and
 where is it going?" — without shipping a byte of your data to anyone else.
@@ -46,8 +48,8 @@ your own (even air-gapped) cluster.
 - **Invoice reconciliation** (`billsyncd`, opt-in): syncs actual billed cost
   from OpenAI/Anthropic admin APIs and shows drift + untracked spend.
   See [docs/billing-sync.md](docs/billing-sync.md).
-- **Forecasting:** linear + exponential spend projection with R², month-end
-  estimate — free, not a paid tier.
+- **Forecasting:** Holt-Winters weekly-seasonal, linear, and exponential
+  projections with R², month-end estimates — free, not a paid tier.
 - **Alerting** (`alertd`): daily thresholds, spikes, monthly budgets → webhook /
   Slack.
 - **Dashboard** (Next.js) — dark console UI with overview (MoM deltas),
