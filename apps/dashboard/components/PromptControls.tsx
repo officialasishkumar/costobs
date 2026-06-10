@@ -25,9 +25,9 @@ export function PromptControls({
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-4">
+    <div className="panel reveal reveal-1 flex flex-wrap items-end gap-4 p-4">
       <div className="w-72">
-        <label className="mb-1 block text-tremor-label text-tremor-content">Prompt key</label>
+        <label className="label-mono mb-1.5 block">Prompt key</label>
         <Select
           value={selected}
           onValueChange={(v) => setParam('prompt_key', v)}
@@ -41,7 +41,7 @@ export function PromptControls({
         </Select>
       </div>
       <div className="w-44">
-        <label className="mb-1 block text-tremor-label text-tremor-content">Range</label>
+        <label className="label-mono mb-1.5 block">Range</label>
         <Select value={range} onValueChange={(v) => setParam('range', v)} enableClear={false}>
           {RANGE_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>

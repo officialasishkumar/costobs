@@ -3,6 +3,7 @@ import { resolveRange } from '@/lib/range';
 import { listPromptKeys, getPromptComparison } from '@/lib/queries';
 import { PromptControls } from '@/components/PromptControls';
 import { PromptComparison } from '@/components/PromptComparison';
+import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, QueryError } from '@/components/DataState';
 
 // Reads prompt_version_daily (AggregatingMergeTree) via *Merge functions —
@@ -17,6 +18,14 @@ export default async function PromptsPage({
   const sp = await searchParams;
   const range = resolveRange(sp.range);
   const org = await currentOrgSlug();
+
+  const header = (
+    <PageHeader
+      eyebrow="04 / prompts"
+      title="Prompt version A/B"
+      description="Compare cost, output volume, and p95 latency across versions of the same prompt."
+    />
+  );
 
   try {
     const promptKeys = await listPromptKeys(org);
@@ -34,6 +43,7 @@ export default async function PromptsPage({
 
     return (
       <div className="space-y-6">
+        {header}
         <PromptControls promptKeys={promptKeys} selected={selected} range={range.key} />
         {body}
       </div>
@@ -41,6 +51,7 @@ export default async function PromptsPage({
   } catch (err) {
     return (
       <div className="space-y-6">
+        {header}
         <QueryError error={err} />
       </div>
     );

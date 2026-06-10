@@ -15,20 +15,22 @@ export function RangeSelect({ value }: { value: RangeKey }) {
   }
 
   return (
-    <div className="inline-flex rounded-tremor-default bg-tremor-background p-1 shadow-tremor-card">
+    <div className="inline-flex rounded-tremor-small border border-carbon-600 bg-carbon-850 p-0.5">
       {RANGE_OPTIONS.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
+          aria-pressed={o.value === value}
+          title={o.label}
           className={
-            'rounded-tremor-small px-3 py-1 text-tremor-default font-medium transition-colors ' +
+            'rounded-[3px] px-3 py-1.5 font-mono text-xs font-medium uppercase tracking-wider transition-colors duration-150 ' +
             (o.value === value
-              ? 'bg-tremor-brand text-tremor-brand-inverted'
-              : 'text-tremor-content hover:bg-tremor-background-subtle')
+              ? 'bg-ember text-carbon-900'
+              : 'text-dark-tremor-content hover:bg-carbon-800 hover:text-dark-tremor-content-emphasis')
           }
         >
-          {o.label}
+          {o.value}d
         </button>
       ))}
     </div>

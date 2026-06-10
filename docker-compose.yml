@@ -19,7 +19,9 @@ services:
     volumes:
       - ch_data:/var/lib/clickhouse
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      # 127.0.0.1, not localhost: Alpine resolves localhost to ::1 first and
+      # the container may not listen on IPv6, deadlocking the whole stack.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -60,10 +62,12 @@ services:
       clickhouse: { condition: service_healthy }
     volumes:
       - ./db/clickhouse/migrations:/migrations:ro
-    command: >
-      -path=/migrations
-      -database=clickhouse://clickhouse:9000?username=${CLICKHOUSE_USER:-costobs}&password=${CLICKHOUSE_PASSWORD:-costobs}&database=${CLICKHOUSE_DB:-costobs}&x-multi-statement=true
-      up
+    # List form, not a folded string: the `&`s in the URL are shell control
+    # characters and silently truncate the command when string-parsed.
+    command:
+      - "-path=/migrations"
+      - "-database=clickhouse://clickhouse:9000?username=${CLICKHOUSE_USER:-costobs}&password=${CLICKHOUSE_PASSWORD:-costobs}&database=${CLICKHOUSE_DB:-costobs}&x-multi-statement=true"
+      - "up"
     restart: on-failure
 
   ingest:

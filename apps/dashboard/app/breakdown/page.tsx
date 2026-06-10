@@ -3,10 +3,11 @@ import { resolveRange } from '@/lib/range';
 import { getBreakdown, type BreakdownDim } from '@/lib/queries';
 import { BreakdownControls } from '@/components/BreakdownControls';
 import { BreakdownView } from '@/components/BreakdownView';
+import { PageHeader } from '@/components/PageHeader';
 import { QueryError } from '@/components/DataState';
 
 // Reads pre-aggregated rollups (cost_attr_hourly for customer/feature/team,
-// cost_daily for provider/model) — sub-second, never touches raw events.
+// cost_daily for provider/model); mixed combinations drill into raw events.
 export const dynamic = 'force-dynamic';
 
 const VALID: BreakdownDim[] = ['customer', 'feature', 'team', 'model', 'provider'];
@@ -51,6 +52,11 @@ export default async function BreakdownPage({
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        eyebrow="02 / breakdown"
+        title="Cost attribution"
+        description="Slice spend by customer, feature, team, model, or provider — pairwise."
+      />
       <BreakdownControls
         primary={primary}
         secondary={secondary ?? ''}

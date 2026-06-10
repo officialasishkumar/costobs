@@ -1,6 +1,6 @@
 'use client';
 
-import { AreaChart, Card, Title } from '@tremor/react';
+import { AreaChart } from '@tremor/react';
 import { fmtUsd } from '@/lib/format';
 import type { ForecastResult } from '@/lib/forecast';
 
@@ -20,27 +20,30 @@ export function ForecastChart({
       : {}),
   }));
 
-  const categories = showExponential && result.exponential
-    ? ['Actual', 'Linear projection', 'Exponential projection']
-    : ['Actual', 'Linear projection'];
+  const categories =
+    showExponential && result.exponential
+      ? ['Actual', 'Linear projection', 'Exponential projection']
+      : ['Actual', 'Linear projection'];
 
   return (
-    <Card>
-      <Title>Daily spend: actual vs projected</Title>
-      <p className="mt-1 text-tremor-label text-tremor-content">
-        Projection begins {result.dividerDate ?? '—'}
-      </p>
+    <section className="panel panel--ticked reveal reveal-4 p-5">
+      <div className="flex items-baseline justify-between">
+        <h2 className="label-mono">Daily spend — actual vs projected</h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-dark-tremor-content-subtle">
+          projection begins {result.dividerDate ?? '—'}
+        </span>
+      </div>
       <AreaChart
         className="mt-4 h-80"
         data={data}
         index="date"
         categories={categories}
-        colors={['blue', 'amber', 'rose']}
+        colors={['amber', 'cyan', 'rose']}
         valueFormatter={fmtUsd}
         yAxisWidth={72}
         connectNulls
         noDataText="Not enough history to forecast"
       />
-    </Card>
+    </section>
   );
 }

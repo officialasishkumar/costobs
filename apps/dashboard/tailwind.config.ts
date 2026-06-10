@@ -1,7 +1,10 @@
 import type { Config } from 'tailwindcss';
 
-// Tailwind config including Tremor's class surface so its components style correctly.
+// Tailwind config including Tremor's class surface so its components style
+// correctly. The dashboard renders exclusively in dark mode ("cost console"
+// aesthetic): carbon surfaces, terminal-amber brand accent, mono numerals.
 const config: Config = {
+  darkMode: 'class',
   content: [
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -11,15 +14,35 @@ const config: Config = {
     transparent: 'transparent',
     current: 'currentColor',
     extend: {
+      fontFamily: {
+        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        display: ['var(--font-display)', 'var(--font-sans)', 'sans-serif'],
+      },
       colors: {
-        // Tremor light theme tokens
+        // CostObs console palette
+        carbon: {
+          950: '#07090B',
+          900: '#0B0D10',
+          850: '#11151A',
+          800: '#161B21',
+          700: '#1E252D',
+          600: '#232B33',
+        },
+        ember: {
+          DEFAULT: '#FFB224',
+          bright: '#FFC95C',
+          dim: '#8A6210',
+          faint: '#231B0A',
+        },
+        // Tremor light theme tokens (unused at runtime; kept for safety)
         tremor: {
           brand: {
-            faint: '#eff6ff',
-            muted: '#bfdbfe',
-            subtle: '#60a5fa',
-            DEFAULT: '#3b82f6',
-            emphasis: '#1d4ed8',
+            faint: '#fffbeb',
+            muted: '#fde68a',
+            subtle: '#fbbf24',
+            DEFAULT: '#d97706',
+            emphasis: '#b45309',
             inverted: '#ffffff',
           },
           background: {
@@ -40,27 +63,27 @@ const config: Config = {
         },
         'dark-tremor': {
           brand: {
-            faint: '#0B1229',
-            muted: '#172554',
-            subtle: '#1e40af',
-            DEFAULT: '#3b82f6',
-            emphasis: '#60a5fa',
-            inverted: '#030712',
+            faint: '#231B0A',
+            muted: '#3A2D10',
+            subtle: '#8A6210',
+            DEFAULT: '#FFB224',
+            emphasis: '#FFC95C',
+            inverted: '#0B0D10',
           },
           background: {
-            muted: '#131A2B',
-            subtle: '#1f2937',
-            DEFAULT: '#111827',
-            emphasis: '#d1d5db',
+            muted: '#0B0D10',
+            subtle: '#1E252D',
+            DEFAULT: '#11151A',
+            emphasis: '#C9D4DE',
           },
-          border: { DEFAULT: '#1f2937' },
-          ring: { DEFAULT: '#1f2937' },
+          border: { DEFAULT: '#232B33' },
+          ring: { DEFAULT: '#232B33' },
           content: {
-            subtle: '#4b5563',
-            DEFAULT: '#6b7280',
-            emphasis: '#e5e7eb',
-            strong: '#f9fafb',
-            inverted: '#000000',
+            subtle: '#5C6975',
+            DEFAULT: '#9AA7B4',
+            emphasis: '#C9D4DE',
+            strong: '#E8EDF2',
+            inverted: '#0B0D10',
           },
         },
       },
@@ -68,13 +91,14 @@ const config: Config = {
         'tremor-input': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
         'tremor-card': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
         'tremor-dropdown': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-        'dark-tremor-input': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-        'dark-tremor-card': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        'dark-tremor-dropdown': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        'dark-tremor-input': '0 1px 2px 0 rgb(0 0 0 / 0.4)',
+        'dark-tremor-card': '0 1px 2px 0 rgb(0 0 0 / 0.45)',
+        'dark-tremor-dropdown': '0 10px 24px -6px rgb(0 0 0 / 0.65)',
+        glow: '0 0 24px -6px rgb(255 178 36 / 0.35)',
       },
       borderRadius: {
-        'tremor-small': '0.375rem',
-        'tremor-default': '0.5rem',
+        'tremor-small': '0.25rem',
+        'tremor-default': '0.375rem',
         'tremor-full': '9999px',
       },
       fontSize: {

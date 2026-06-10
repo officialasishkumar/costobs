@@ -1,15 +1,17 @@
-import { Grid } from '@tremor/react';
 import { currentOrgSlug } from '@/lib/tenant';
 import { resolveRange } from '@/lib/range';
 import {
   getOverviewTotals,
   getDailySpend,
   getCostByProvider,
+  getCostByModel,
 } from '@/lib/queries';
 import { KpiCards } from '@/components/KpiCards';
 import { SpendChart } from '@/components/SpendChart';
 import { ProviderDonut } from '@/components/ProviderDonut';
+import { TopModels } from '@/components/TopModels';
 import { RangeSelect } from '@/components/RangeSelect';
+import { PageHeader } from '@/components/PageHeader';
 import { QueryError } from '@/components/DataState';
 
 // Reads pre-aggregated cost_daily only — sub-second on large event volumes.
@@ -24,37 +26,43 @@ export default async function OverviewPage({
   const range = resolveRange(sp.range);
   const org = await currentOrgSlug();
 
+  const header = (
+    <PageHeader
+      eyebrow="01 / overview"
+      title="Spend overview"
+      description={
+        <span className="font-mono text-xs">
+          {range.from} → {range.to}
+        </span>
+      }
+    >
+      <RangeSelect value={range.key} />
+    </PageHeader>
+  );
+
   try {
-    const [totals, daily, byProvider] = await Promise.all([
+    const [totals, daily, byProvider, byModel] = await Promise.all([
       getOverviewTotals(org, range.from, range.to),
       getDailySpend(org, range.from, range.to),
       getCostByProvider(org, range.from, range.to),
+      getCostByModel(org, range.from, range.to),
     ]);
 
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <p className="text-tremor-default text-tremor-content">
-            {range.from} → {range.to}
-          </p>
-          <RangeSelect value={range.key} />
-        </div>
-        <KpiCards kpis={totals} />
+        {header}
+        <KpiCards kpis={totals} spark={daily} />
         <SpendChart data={daily} />
-        <Grid numItemsLg={2} className="gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ProviderDonut data={byProvider} />
-        </Grid>
+          <TopModels data={byModel} />
+        </div>
       </div>
     );
   } catch (err) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <p className="text-tremor-default text-tremor-content">
-            {range.from} → {range.to}
-          </p>
-          <RangeSelect value={range.key} />
-        </div>
+        {header}
         <QueryError error={err} />
       </div>
     );

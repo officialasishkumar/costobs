@@ -33,9 +33,9 @@ export function BreakdownControls({
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-4">
+    <div className="panel reveal reveal-1 flex flex-wrap items-end gap-4 p-4">
       <div className="w-44">
-        <label className="mb-1 block text-tremor-label text-tremor-content">Group by</label>
+        <label className="label-mono mb-1.5 block">Group by</label>
         <Select value={primary} onValueChange={(v) => setParam('primary', v)} enableClear={false}>
           {DIMS.map((d) => (
             <SelectItem key={d.value} value={d.value}>
@@ -45,9 +45,7 @@ export function BreakdownControls({
         </Select>
       </div>
       <div className="w-44">
-        <label className="mb-1 block text-tremor-label text-tremor-content">
-          Secondary (optional)
-        </label>
+        <label className="label-mono mb-1.5 block">Secondary · optional</label>
         <Select value={secondary} onValueChange={(v) => setParam('secondary', v)}>
           {DIMS.map((d) => (
             <SelectItem key={d.value} value={d.value}>
@@ -57,7 +55,7 @@ export function BreakdownControls({
         </Select>
       </div>
       <div className="w-44">
-        <label className="mb-1 block text-tremor-label text-tremor-content">Range</label>
+        <label className="label-mono mb-1.5 block">Range</label>
         <Select value={range} onValueChange={(v) => setParam('range', v)} enableClear={false}>
           {RANGE_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>

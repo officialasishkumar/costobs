@@ -64,11 +64,13 @@ export async function getDailySpend(
 ): Promise<DailySpendPoint[]> {
   const params = { org, from, to };
   assertOrgScoped(params);
-  const rows = await chQuery<{ date: string; cost_usd: string; requests: string }>(
+  // The alias must not be named `date`: it would shadow the Date column in
+  // WHERE/GROUP BY and make ClickHouse compare String to Date (NO_COMMON_TYPE).
+  const rows = await chQuery<{ day: string; total_cost: string; total_requests: string }>(
     `SELECT
-        toString(date)   AS date,
-        sum(cost_usd)    AS cost_usd,
-        sum(requests)    AS requests
+        toString(date)   AS day,
+        sum(cost_usd)    AS total_cost,
+        sum(requests)    AS total_requests
      FROM cost_daily
      WHERE org_id = {org:String}
        AND date >= {from:Date}
@@ -78,9 +80,9 @@ export async function getDailySpend(
     params,
   );
   return rows.map((r) => ({
-    date: r.date,
-    cost_usd: Number(r.cost_usd),
-    requests: Number(r.requests),
+    date: r.day,
+    cost_usd: Number(r.total_cost),
+    requests: Number(r.total_requests),
   }));
 }
 
@@ -109,6 +111,34 @@ export async function getCostByProvider(
      GROUP BY provider
      ORDER BY total_cost DESC
      LIMIT 12`,
+    params,
+  );
+  return rows.map((r) => ({
+    name: r.name || '(unknown)',
+    cost_usd: Number(r.total_cost),
+    requests: Number(r.total_requests),
+  }));
+}
+
+export async function getCostByModel(
+  org: string,
+  from: string,
+  to: string,
+): Promise<DimensionSlice[]> {
+  const params = { org, from, to };
+  assertOrgScoped(params);
+  const rows = await chQuery<{ name: string; total_cost: string; total_requests: string }>(
+    `SELECT
+        model          AS name,
+        sum(cost_usd)  AS total_cost,
+        sum(requests)  AS total_requests
+     FROM cost_daily
+     WHERE org_id = {org:String}
+       AND date >= {from:Date}
+       AND date <= {to:Date}
+     GROUP BY model
+     ORDER BY total_cost DESC
+     LIMIT 8`,
     params,
   );
   return rows.map((r) => ({
@@ -339,14 +369,16 @@ export async function getRequests(
   params.limit = f.limit;
   params.offset = f.offset;
   assertOrgScoped(params);
+  // ts/cost_usd string casts must NOT reuse the column names: the aliases
+  // would shadow the real columns in WHERE/ORDER BY (NO_COMMON_TYPE errors).
   const rows = await chQuery<Record<string, string>>(
     `SELECT
         request_id,
-        toString(ts)       AS ts,
+        toString(ts)       AS ts_str,
         provider, model, operation, status, error_type,
         feature, customer_id, team, trace_id, environment,
         input_tokens, output_tokens, total_tokens,
-        toString(cost_usd) AS cost_usd,
+        toString(cost_usd) AS cost_str,
         latency_ms
      FROM events
      WHERE ${clause}
@@ -356,7 +388,7 @@ export async function getRequests(
   );
   return rows.map((r) => ({
     request_id: r.request_id,
-    ts: r.ts,
+    ts: r.ts_str,
     provider: r.provider,
     model: r.model,
     operation: r.operation,
@@ -370,7 +402,7 @@ export async function getRequests(
     input_tokens: Number(r.input_tokens),
     output_tokens: Number(r.output_tokens),
     total_tokens: Number(r.total_tokens),
-    cost_usd: Number(r.cost_usd),
+    cost_usd: Number(r.cost_str),
     latency_ms: Number(r.latency_ms),
   }));
 }
@@ -474,11 +506,11 @@ export async function getDailyTotalsForForecast(
 ): Promise<DailySpendPoint[]> {
   const params = { org, days };
   assertOrgScoped(params);
-  const rows = await chQuery<{ date: string; cost_usd: string; requests: string }>(
+  const rows = await chQuery<{ day: string; total_cost: string; total_requests: string }>(
     `SELECT
-        toString(date) AS date,
-        sum(cost_usd)  AS cost_usd,
-        sum(requests)  AS requests
+        toString(date) AS day,
+        sum(cost_usd)  AS total_cost,
+        sum(requests)  AS total_requests
      FROM cost_daily
      WHERE org_id = {org:String}
        AND date >  today() - {days:UInt32}
@@ -488,8 +520,8 @@ export async function getDailyTotalsForForecast(
     params,
   );
   return rows.map((r) => ({
-    date: r.date,
-    cost_usd: Number(r.cost_usd),
-    requests: Number(r.requests),
+    date: r.day,
+    cost_usd: Number(r.total_cost),
+    requests: Number(r.total_requests),
   }));
 }

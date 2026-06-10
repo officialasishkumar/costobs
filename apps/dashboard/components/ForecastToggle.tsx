@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { Button } from '@tremor/react';
 
 export function ForecastToggle({ showExponential }: { showExponential: boolean }) {
   const router = useRouter();
@@ -16,8 +15,18 @@ export function ForecastToggle({ showExponential }: { showExponential: boolean }
   }
 
   return (
-    <Button variant={showExponential ? 'primary' : 'secondary'} onClick={toggle}>
-      {showExponential ? 'Hide' : 'Show'} exponential trend
-    </Button>
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={showExponential}
+      className={
+        'rounded-tremor-small border px-3 py-1.5 font-mono text-xs font-medium uppercase tracking-wider transition-colors duration-150 ' +
+        (showExponential
+          ? 'border-ember bg-ember text-carbon-900'
+          : 'border-carbon-600 bg-carbon-850 text-dark-tremor-content hover:border-ember-dim hover:text-dark-tremor-content-strong')
+      }
+    >
+      exp trend {showExponential ? 'on' : 'off'}
+    </button>
   );
 }

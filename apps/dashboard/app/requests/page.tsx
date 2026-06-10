@@ -4,6 +4,7 @@ import { getRequests, countRequests, type RequestFilters } from '@/lib/queries';
 import { RequestsFilters } from '@/components/RequestsFilters';
 import { RequestsTable } from '@/components/RequestsTable';
 import { Pagination } from '@/components/Pagination';
+import { PageHeader } from '@/components/PageHeader';
 import { QueryError } from '@/components/DataState';
 
 // The ONLY view that queries raw `events`. Always bounded by a LIMIT/OFFSET and
@@ -57,6 +58,11 @@ export default async function RequestsPage({
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        eyebrow="03 / requests"
+        title="Request drill-down"
+        description="Every observed provider call with per-request cost. Raw events, bloom-indexed filters."
+      />
       <RequestsFilters
         initial={{
           provider: str(sp.provider),

@@ -2,14 +2,12 @@
 
 import {
   BarChart,
-  Card,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeaderCell,
   TableRow,
-  Title,
 } from '@tremor/react';
 import { useMemo, useState } from 'react';
 import { fmtUsd, fmtInt, fmtUsdPrecise } from '@/lib/format';
@@ -67,60 +65,65 @@ export function BreakdownView({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <Title>Cost by {colName} (top 20)</Title>
+      <section className="panel panel--ticked reveal reveal-2 p-5">
+        <h2 className="label-mono">Cost by {colName} — top 20</h2>
         <BarChart
           className="mt-4 h-80"
           data={chartData}
           index="name"
           categories={['Cost (USD)']}
-          colors={['blue']}
+          colors={['amber']}
           valueFormatter={fmtUsd}
           showLegend={false}
           yAxisWidth={72}
           noDataText="No data for this selection"
         />
-      </Card>
-      <Card>
+      </section>
+      <section className="panel reveal reveal-3 overflow-x-auto">
         <Table>
           <TableHead>
-            <TableRow>
+            <TableRow className="border-b border-carbon-600">
               <TableHeaderCell
-                className="cursor-pointer select-none"
+                className="label-mono cursor-pointer select-none"
                 onClick={() => toggleSort('label')}
               >
                 {colName}
                 {arrow('label')}
               </TableHeaderCell>
               <TableHeaderCell
-                className="cursor-pointer select-none text-right"
+                className="label-mono cursor-pointer select-none text-right"
                 onClick={() => toggleSort('cost_usd')}
               >
                 Cost{arrow('cost_usd')}
               </TableHeaderCell>
               <TableHeaderCell
-                className="cursor-pointer select-none text-right"
+                className="label-mono cursor-pointer select-none text-right"
                 onClick={() => toggleSort('requests')}
               >
                 Requests{arrow('requests')}
               </TableHeaderCell>
-              <TableHeaderCell className="text-right">Cost / req</TableHeaderCell>
+              <TableHeaderCell className="label-mono text-right">Cost / req</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {sorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-tremor-content">
+                <TableCell colSpan={4} className="py-10 text-center text-dark-tremor-content">
                   No data for this selection
                 </TableCell>
               </TableRow>
             ) : (
               sorted.map((r, i) => (
-                <TableRow key={`${r.label}-${i}`}>
-                  <TableCell>{r.label}</TableCell>
-                  <TableCell className="text-right">{fmtUsd(r.cost_usd)}</TableCell>
-                  <TableCell className="text-right">{fmtInt(r.requests)}</TableCell>
-                  <TableCell className="text-right">
+                <TableRow
+                  key={`${r.label}-${i}`}
+                  className="border-b border-carbon-700/50 transition-colors hover:bg-carbon-800/50"
+                >
+                  <TableCell className="text-dark-tremor-content-emphasis">{r.label}</TableCell>
+                  <TableCell className="readout text-right text-xs text-ember-bright">
+                    {fmtUsd(r.cost_usd)}
+                  </TableCell>
+                  <TableCell className="readout text-right text-xs">{fmtInt(r.requests)}</TableCell>
+                  <TableCell className="readout text-right text-xs">
                     {fmtUsdPrecise(r.requests > 0 ? r.cost_usd / r.requests : 0)}
                   </TableCell>
                 </TableRow>
@@ -128,7 +131,7 @@ export function BreakdownView({
             )}
           </TableBody>
         </Table>
-      </Card>
+      </section>
     </div>
   );
 }

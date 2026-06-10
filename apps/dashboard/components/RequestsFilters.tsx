@@ -66,10 +66,10 @@ export function RequestsFilters({ initial }: { initial: RequestsFilterValues }) 
     badge?: string,
   ) => (
     <div className="w-44">
-      <label className="mb-1 flex items-center gap-1 text-tremor-label text-tremor-content">
+      <label className="label-mono mb-1.5 flex items-center gap-1.5">
         {label}
         {badge && (
-          <span className="rounded-tremor-full bg-tremor-brand-faint px-1.5 py-0.5 text-[10px] font-medium text-tremor-brand-emphasis">
+          <span className="rounded-tremor-small border border-ember-dim/60 bg-ember-faint px-1.5 py-0.5 font-mono text-[9px] font-medium normal-case tracking-normal text-ember">
             {badge}
           </span>
         )}
@@ -86,7 +86,7 @@ export function RequestsFilters({ initial }: { initial: RequestsFilterValues }) 
   );
 
   return (
-    <div className="space-y-4 rounded-tremor-default bg-tremor-background p-4 shadow-tremor-card">
+    <div className="panel reveal reveal-1 space-y-4 p-4">
       <div className="flex flex-wrap items-end gap-4">
         {field('provider', 'Provider')}
         {field('model', 'Model')}
@@ -94,7 +94,7 @@ export function RequestsFilters({ initial }: { initial: RequestsFilterValues }) 
         {field('customer_id', 'Customer ID', 'bloom idx')}
         {field('trace_id', 'Trace ID', 'bloom idx')}
         <div className="w-40">
-          <label className="mb-1 block text-tremor-label text-tremor-content">Status</label>
+          <label className="label-mono mb-1.5 block">Status</label>
           <Select
             value={v.status}
             onValueChange={(val) => setV((s) => ({ ...s, status: val }))}
@@ -104,7 +104,7 @@ export function RequestsFilters({ initial }: { initial: RequestsFilterValues }) 
           </Select>
         </div>
         <div className="w-40">
-          <label className="mb-1 block text-tremor-label text-tremor-content">Range</label>
+          <label className="label-mono mb-1.5 block">Range</label>
           <Select
             value={v.range}
             onValueChange={(val) => setV((s) => ({ ...s, range: val }))}
