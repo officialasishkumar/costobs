@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docs — CostObs</title>
+  <meta name="description" content="CostObs documentation: quickstart, SDKs for Python/TypeScript/Go, attribution, billing sync, alerts, self-hosting." />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>document.documentElement.classList.add("js");</script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="wordmark cursor-blink" href="index.html">costobs</a>
+    <nav class="topnav">
+      <a href="index.html#how">How it works</a>
+      <a href="index.html#features">Features</a>
+      <a href="docs.html">Docs</a>
+      <a class="btn btn--ghost" href="https://github.com/officialasishkumar/costobs">★ GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap docs-layout">
+
+  <!-- ==================== sidebar ==================== -->
+  <nav class="docs-nav">
+    <p class="label-mono">start</p>
+    <a href="#quickstart">Quickstart</a>
+    <a href="#demo">Demo data</a>
+    <p class="label-mono">sdks</p>
+    <a href="#sdk-python">Python</a>
+    <a href="#sdk-ts">TypeScript</a>
+    <a href="#sdk-go">Go</a>
+    <a href="#metadata">Metadata &amp; attribution</a>
+    <a href="#record">record() — anything else</a>
+    <p class="label-mono">platform</p>
+    <a href="#pricing">Pricing file</a>
+    <a href="#reconciliation">Billing sync &amp; reconciliation</a>
+    <a href="#eng-roi">Cost per PR / engineer</a>
+    <a href="#alerts">Alerts</a>
+    <p class="label-mono">operate</p>
+    <a href="#self-hosting">Self-hosting</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#privacy">Privacy guarantees</a>
+  </nav>
+
+  <!-- ==================== content ==================== -->
+  <main class="docs-main">
+    <p class="label-mono eyebrow">documentation</p>
+    <h1>Everything you need,<br />nothing leaves your infra.</h1>
+    <p>CostObs is self-hostable AI/LLM cost observability with per-request
+    attribution. These docs cover the five-minute setup, the three SDKs, and
+    the operational pieces. The deeper reference lives in the repo's
+    <a href="https://github.com/officialasishkumar/costobs/tree/master/docs">docs/</a> directory.</p>
+
+    <!-- ============================================================ -->
+    <section id="quickstart">
+      <h2>Quickstart</h2>
+      <p>One command brings up ClickHouse, Postgres, migrations, the ingest
+      API, the alert evaluator, the (idle until opted-in) billing sync, and
+      the dashboard:</p>
+<pre class="code" data-copy>git clone https://github.com/officialasishkumar/costobs
+cd costobs
+cp .env.example .env
+docker compose up</pre>
+      <p>Open <code class="inline">http://localhost:3000</code>. A default org
+      and a dev API key (<code class="inline">costobs_dev_secret_key</code>)
+      are seeded on boot — the dashboard's first-run screen walks you through
+      sending your first event.</p>
+    </section>
+
+    <section id="demo">
+      <h2>Demo data</h2>
+      <p>No provider key handy? Populate every chart with 30k synthetic
+      events (45 days, weekday seasonality, simulated provider bills for the
+      reconciliation page):</p>
+<pre class="code" data-copy>make demo-data</pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="sdk-python">
+      <h2>Python SDK</h2>
+<pre class="code" data-copy>pip install costobs</pre>
+<pre class="code"><span class="k">import</span> costobs
+<span class="k">from</span> openai <span class="k">import</span> OpenAI
+
+costobs.<span class="f">configure</span>(ingest_url=<span class="s">"http://localhost:8080"</span>, api_key=<span class="s">"costobs_dev_secret_key"</span>)
+
+client = costobs.<span class="f">wrap</span>(OpenAI(), team=<span class="s">"payments"</span>, environment=<span class="s">"prod"</span>)
+
+<span class="k">with</span> costobs.<span class="f">request_context</span>(customer_id=<span class="s">"cust-42"</span>, trace_id=<span class="s">"trace-abc"</span>):
+    client.chat.completions.create(
+        model=<span class="s">"gpt-4o"</span>,
+        messages=[...],
+        feature=<span class="s">"summarize"</span>,        <span class="c"># per-call metadata</span>
+        prompt_version=<span class="s">"v3"</span>,
+    )
+
+costobs.<span class="f">flush</span>()   <span class="c"># drain before short-lived scripts exit</span></pre>
+      <h3>Supported clients</h3>
+      <ul>
+        <li><code class="inline">OpenAI()</code> / <code class="inline">AsyncOpenAI()</code> — chat, responses, embeddings, streaming (usage injected via <code class="inline">include_usage</code>)</li>
+        <li>OpenAI-compatible via <code class="inline">base_url</code>: xAI/Grok, Together, Fireworks, OpenRouter, Groq, DeepSeek, Mistral, Azure — the real provider is stamped automatically</li>
+        <li><code class="inline">anthropic.Anthropic()</code> — incl. extended-thinking token accounting in streams</li>
+        <li><code class="inline">google-genai</code> — Gemini</li>
+        <li><code class="inline">boto3.client("bedrock-runtime")</code> — Converse API</li>
+        <li><code class="inline">costobs.wrap(litellm)</code> — pass the module; provider derived per call from the routing prefix</li>
+      </ul>
+      <h3>Decorator</h3>
+<pre class="code"><span class="k">@costobs</span>.<span class="f">trace</span>(feature=<span class="s">"search"</span>, team=<span class="s">"discovery"</span>)
+<span class="k">def</span> <span class="f">handle_query</span>(q): ...   <span class="c"># works on async functions too</span></pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="sdk-ts">
+      <h2>TypeScript SDK</h2>
+<pre class="code" data-copy>npm install @costobs/sdk</pre>
+<pre class="code"><span class="k">import</span> OpenAI <span class="k">from</span> <span class="s">"openai"</span>;
+<span class="k">import</span> { wrap, requestContext, flush } <span class="k">from</span> <span class="s">"@costobs/sdk"</span>;
+
+<span class="k">const</span> client = <span class="f">wrap</span>(<span class="k">new</span> OpenAI(), { team: <span class="s">"payments"</span>, environment: <span class="s">"prod"</span> });
+
+<span class="k">await</span> <span class="f">requestContext</span>({ customer_id: <span class="s">"cust-42"</span> }, <span class="k">async</span> () =&gt; {
+  <span class="k">await</span> client.chat.completions.create({
+    model: <span class="s">"gpt-4o"</span>,
+    messages: [...],
+    costobs: { feature: <span class="s">"summarize"</span>, promptVersion: <span class="s">"v3"</span> },
+  });
+});
+
+<span class="k">await</span> <span class="f">flush</span>();</pre>
+      <h3>Vercel AI SDK</h3>
+<pre class="code"><span class="k">import</span> { trackGenerateText, trackStreamText } <span class="k">from</span> <span class="s">"@costobs/sdk"</span>;
+
+<span class="k">const</span> result = <span class="k">await</span> <span class="f">trackGenerateText</span>(
+  <span class="f">generateText</span>({ model: <span class="f">openai</span>(<span class="s">"gpt-4o"</span>), prompt }),
+  { feature: <span class="s">"summarize"</span>, customer_id: <span class="s">"cust-42"</span> },
+);
+
+<span class="k">const</span> stream = <span class="f">trackStreamText</span>(<span class="f">streamText</span>({ model, prompt }), { feature: <span class="s">"chat"</span> });</pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="sdk-go">
+      <h2>Go SDK</h2>
+      <p>Go takes the transport seam: wrap any provider SDK built on
+      <code class="inline">net/http</code> with an observing
+      <code class="inline">RoundTripper</code>. Streams are teed; unknown hosts
+      pass through untouched.</p>
+<pre class="code">co := costobs.<span class="f">New</span>(costobs.Config{
+    IngestURL: <span class="s">"http://localhost:8080"</span>, APIKey: <span class="s">"costobs_dev_secret_key"</span>,
+    Team: <span class="s">"payments"</span>, Environment: <span class="s">"prod"</span>,
+})
+<span class="k">defer</span> co.<span class="f">Close</span>()
+
+httpClient := &amp;http.Client{Transport: co.<span class="f">Transport</span>(<span class="k">nil</span>)}
+oai := openai.<span class="f">NewClient</span>(option.<span class="f">WithHTTPClient</span>(httpClient))
+
+ctx = costobs.<span class="f">WithMetadata</span>(ctx, costobs.Metadata{
+    CustomerID: <span class="s">"cust-42"</span>, Feature: <span class="s">"chat"</span>,
+    Tags: <span class="k">map</span>[<span class="k">string</span>]<span class="k">string</span>{<span class="s">"pr"</span>: <span class="s">"1234"</span>},
+})
+resp, err := oai.Chat.Completions.<span class="f">New</span>(ctx, ...)</pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="metadata">
+      <h2>Metadata &amp; attribution</h2>
+      <p>Nine first-class fields map to event columns; anything else becomes a
+      tag. Three layers, later wins:</p>
+      <table>
+        <tr><th>layer</th><th>python</th><th>typescript</th><th>go</th></tr>
+        <tr><td>wrap-time defaults</td><td>wrap(client, team=…)</td><td>wrap(client, {team})</td><td>Config{Team: …}</td></tr>
+        <tr><td>request scope</td><td>request_context() / @trace</td><td>requestContext()</td><td>WithMetadata(ctx, …)</td></tr>
+        <tr><td>per call</td><td>feature=, prompt_version=</td><td>costobs: {…}</td><td>—</td></tr>
+      </table>
+      <p>Fields: <code class="inline">customer_id</code>,
+      <code class="inline">user_id</code>, <code class="inline">trace_id</code>,
+      <code class="inline">feature</code>, <code class="inline">team</code>,
+      <code class="inline">service</code>, <code class="inline">environment</code>,
+      <code class="inline">prompt_key</code>, <code class="inline">prompt_version</code>
+      + free-form <code class="inline">tags</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="record">
+      <h2>record() — anything else</h2>
+      <p>For providers without an adapter (Deepgram, ElevenLabs, gRPC APIs,
+      batch jobs), record the call manually. It prices locally, merges the
+      active context, and ships async like everything else:</p>
+<pre class="code">costobs.<span class="f">record</span>(
+    provider=<span class="s">"elevenlabs"</span>, model=<span class="s">"eleven_multilingual_v2"</span>,
+    operation=<span class="s">"audio"</span>, characters=<span class="k">len</span>(text),
+    feature=<span class="s">"narration"</span>, customer_id=<span class="s">"cust-7"</span>,
+)
+
+costobs.<span class="f">record</span>(
+    provider=<span class="s">"deepgram"</span>, model=<span class="s">"nova-3"</span>,
+    operation=<span class="s">"audio"</span>, audio_seconds=resp.metadata.duration,
+)</pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="pricing">
+      <h2>Pricing file</h2>
+      <p>One versioned YAML (<code class="inline">shared/pricing/</code>) is the
+      source of truth for SDKs and backend alike — per-token, cached-token,
+      reasoning, tool, image-tier, audio-second, and per-character rates, all
+      computed with exact decimal math. Edit it, bump
+      <code class="inline">version</code>, run
+      <code class="inline">make sync-pricing</code> — no SDK release needed.
+      Unknown models are tracked at $0 until you add a rate, so nothing is
+      silently lost.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="reconciliation">
+      <h2>Billing sync &amp; reconciliation</h2>
+      <p>SDK costs are estimates. <code class="inline">billsyncd</code> pulls
+      <em>actual</em> daily bills from provider admin APIs into
+      <code class="inline">billed_daily</code>; the Reconcile page shows drift
+      per provider and <strong>untracked spend</strong> — billed cost no SDK
+      event accounts for.</p>
+      <div class="callout">
+        <p class="label-mono">opt-in by design</p>
+        billsyncd is the only CostObs component that makes outbound calls,
+        and only when you set a key. Without keys it idles, fully offline.
+      </div>
+<pre class="code" data-copy><span class="c"># .env</span>
+COSTOBS_BILLING_OPENAI_ADMIN_KEY=sk-admin-...
+COSTOBS_BILLING_ANTHROPIC_ADMIN_KEY=sk-ant-admin-...</pre>
+      <p>Air-gapped or unsupported provider? Import invoices straight into the
+      table:</p>
+<pre class="code">INSERT INTO billed_daily (org_id, provider, date, billed_usd, source)
+VALUES ('default', 'gemini', '2026-06-01', 12.34, 'import');</pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="eng-roi">
+      <h2>Cost per PR / engineer / experiment</h2>
+      <p>Tag calls in CI, then slice by any tag on the Breakdown page
+      (<code class="inline">/breakdown?tag=pr</code>):</p>
+<pre class="code"><span class="c"># .github/workflows/preview.yml</span>
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  PR_AUTHOR: ${{ github.event.pull_request.user.login }}</pre>
+<pre class="code">client = costobs.<span class="f">wrap</span>(
+    OpenAI(), environment=<span class="s">"preview"</span>,
+    pr=os.environ.get(<span class="s">"PR_NUMBER"</span>, <span class="s">""</span>),
+    engineer=os.environ.get(<span class="s">"PR_AUTHOR"</span>, <span class="s">""</span>),
+)</pre>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="alerts">
+      <h2>Alerts</h2>
+      <p>Three rule kinds, evaluated by <code class="inline">alertd</code> on an
+      interval, delivered to Slack or any webhook with per-rule cooldowns:</p>
+      <table>
+        <tr><th>kind</th><th>fires when</th><th>config</th></tr>
+        <tr><td>daily_threshold</td><td>today's spend &gt; limit</td><td>{"threshold_usd": 50}</td></tr>
+        <tr><td>spike</td><td>today &gt; factor × baseline</td><td>{"factor": 2, "baseline": "rolling_7d"}</td></tr>
+        <tr><td>monthly_budget</td><td>month-to-date &gt; budget</td><td>{"budget_usd": 1000}</td></tr>
+      </table>
+      <p>Rules are rows in Postgres (<code class="inline">alert_rules</code> +
+      <code class="inline">alert_targets</code>), scopeable to any combination
+      of provider, model, feature, team, customer, user, or environment.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="self-hosting">
+      <h2>Self-hosting</h2>
+      <h3>Mode A — Docker Compose</h3>
+      <p>The quickstart above. Single machine, bundled single-node ClickHouse
+      and Postgres, data in named volumes. Good to ~10M events on a laptop.</p>
+      <h3>Mode B — Kubernetes (Helm)</h3>
+<pre class="code" data-copy>helm install costobs deploy/helm/costobs \
+  -f deploy/k8s-examples/values-small.yaml \
+  --namespace costobs --create-namespace</pre>
+      <p>Scaling, TLS/ingress, OIDC, and bring-your-own external Postgres +
+      ClickHouse are covered in
+      <a href="https://github.com/officialasishkumar/costobs/blob/master/docs/self-hosting.md">docs/self-hosting.md</a>.
+      Every service exposes <code class="inline">/healthz</code> and Prometheus
+      <code class="inline">/metrics</code>.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="architecture">
+      <h2>Architecture</h2>
+<pre class="code">YOUR APP ──(real call, sync)──────────────► LLM PROVIDER
+   │  costobs SDK: local cost calc, build event (NO content)
+   ▼
+background queue ──(async batched POST)──► ingest (Go :8080)
+                                              │ auth + dedup
+                        ┌─────────────────────┴─────────────┐
+                        ▼                                   ▼
+            ClickHouse (events + rollups)        Postgres (orgs, keys, rules)
+                        │                                   │
+                        ▼                                   │
+            dashboard (Next.js :3000) ◄─────────────────────┘
+            alertd (Go :8081) → Slack / webhook
+            billsyncd (Go :8082, opt-in) → billed_daily</pre>
+      <p>ClickHouse materialized views maintain rollups
+      (<code class="inline">cost_daily</code>,
+      <code class="inline">cost_attr_hourly</code>,
+      <code class="inline">prompt_version_daily</code>) so every dashboard page
+      except the raw-request drill-down stays sub-second at 10M+ events.</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="privacy">
+      <h2>Privacy guarantees</h2>
+      <ul>
+        <li><strong>No prompt/response content</strong> — the wire schema has no field for it; it cannot be stored accidentally.</li>
+        <li><strong>No phone home</strong> — no telemetry, no license checks, no cloud control plane.</li>
+        <li><strong>No proxy</strong> — provider calls never route through CostObs; observation is off the hot path.</li>
+        <li><strong>One audited exception</strong> — billsyncd calls provider billing APIs, only when you set its keys.</li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>costobs · apache-2.0 · self-hosted ai cost observability</p>
+    <p>
+      <a href="https://github.com/officialasishkumar/costobs">github</a> ·
+      <a href="index.html">home</a> ·
+      <a href="https://github.com/officialasishkumar/costobs/issues">issues</a>
+    </p>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CostObs — self-hosted AI cost observability</title>
+  <meta name="description" content="Know what every AI call costs — per customer, feature, team, and PR — without sending a byte of your data anywhere. Open source, offline by design." />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>document.documentElement.classList.add("js");</script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="wordmark cursor-blink" href="#">costobs</a>
+    <nav class="topnav">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#compare">Compare</a>
+      <a href="docs.html">Docs</a>
+      <a class="btn btn--ghost" href="https://github.com/officialasishkumar/costobs">★ GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ====================================================================== -->
+<main class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="label-mono eyebrow">open source · apache-2.0 · self-hosted</p>
+      <h1>Know what every AI call costs.<br /><span class="accent">Your data never leaves.</span></h1>
+      <p class="hero-sub">
+        Per-request cost attribution for LLM &amp; AI APIs — by customer,
+        feature, team, prompt version, even merged PR. One line to integrate.
+        Zero bytes phoned home.
+      </p>
+      <div class="hero-ctas">
+        <a class="btn btn--primary" href="docs.html#quickstart">Get started →</a>
+        <a class="btn btn--ghost" href="https://github.com/officialasishkumar/costobs">View source</a>
+      </div>
+      <div class="hero-meta">
+        <span>docker compose up</span>
+        <span>no proxy in your hot path</span>
+        <span>no prompt content stored</span>
+      </div>
+    </div>
+
+    <div class="terminal" aria-hidden="true">
+      <div class="terminal-head">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="title">costobs · live attribution</span>
+      </div>
+      <div class="terminal-body" id="term"></div>
+    </div>
+  </div>
+</main>
+
+<!-- ====================================================================== -->
+<section class="block" id="offline">
+  <div class="wrap">
+    <p class="label-mono eyebrow">01 / the differentiator</p>
+    <h2>Offline by design</h2>
+    <p class="section-sub">
+      Every "AI cost tracking" SaaS asks you to ship usage — and often traffic —
+      to their cloud. CostObs is built the other way around: the SDK computes
+      cost locally from a bundled pricing file and ships metadata to
+      <em>your</em> ClickHouse. Run it on a laptop or in an air-gapped cluster.
+    </p>
+    <div class="strip reveal">
+      <div>
+        <p class="no">no phone home</p>
+        <h3>No telemetry, no license checks</h3>
+        <p>No mandatory cloud control plane, no account, no usage pings. The
+        only outbound call in the whole system is the opt-in billing sync —
+        and it's off by default.</p>
+      </div>
+      <div>
+        <p class="no">no proxy</p>
+        <h3>Never in your hot path</h3>
+        <p>Your calls go straight to the provider. Cost calc happens after the
+        response; shipping is async and batched. &lt;1ms overhead, no new
+        failure mode for production traffic.</p>
+      </div>
+      <div>
+        <p class="no">no content</p>
+        <h3>Prompts are never stored</h3>
+        <p>The wire schema has no slot for prompt or response bodies — it
+        can't leak what it can't carry. Token counts, latency, cost, and your
+        attribution tags. That's it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="block" id="how">
+  <div class="wrap">
+    <p class="label-mono eyebrow">02 / how it works</p>
+    <h2>One line in. Answers out.</h2>
+
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-no">step 01</div>
+        <div style="min-width:0">
+          <h3>Wrap your client</h3>
+          <p>Python, TypeScript, or Go. The wrapper proxies every call straight
+          through and tees usage off the response — including streams.
+          xAI, Together, Groq, Mistral &amp; friends are auto-detected through
+          their OpenAI-compatible endpoints.</p>
+          <div class="tabs" data-tabs>
+            <div class="tab-row">
+              <button class="tab on" data-tab="py">Python</button>
+              <button class="tab" data-tab="ts">TypeScript</button>
+              <button class="tab" data-tab="go">Go</button>
+            </div>
+            <div class="tab-panes">
+<pre class="code on" data-pane="py"><span class="k">import</span> costobs
+<span class="k">from</span> openai <span class="k">import</span> OpenAI
+
+client = costobs.<span class="f">wrap</span>(OpenAI(), team=<span class="s">"payments"</span>, environment=<span class="s">"prod"</span>)
+
+<span class="k">with</span> costobs.<span class="f">request_context</span>(customer_id=<span class="s">"cust-42"</span>):
+    client.chat.completions.create(
+        model=<span class="s">"gpt-4o"</span>, messages=[...],
+        feature=<span class="s">"summarize"</span>, prompt_version=<span class="s">"v3"</span>,
+    )</pre>
+<pre class="code" data-pane="ts"><span class="k">import</span> { wrap } <span class="k">from</span> <span class="s">"@costobs/sdk"</span>;
+
+<span class="k">const</span> client = <span class="f">wrap</span>(<span class="k">new</span> OpenAI(), { team: <span class="s">"payments"</span> });
+
+<span class="k">await</span> client.chat.completions.create({
+  model: <span class="s">"gpt-4o"</span>, messages: [...],
+  costobs: { feature: <span class="s">"summarize"</span>, customer_id: <span class="s">"cust-42"</span> },
+});</pre>
+<pre class="code" data-pane="go">co := costobs.<span class="f">New</span>(costobs.Config{Team: <span class="s">"payments"</span>})
+httpClient := &amp;http.Client{Transport: co.<span class="f">Transport</span>(<span class="k">nil</span>)}
+oai := openai.<span class="f">NewClient</span>(option.<span class="f">WithHTTPClient</span>(httpClient))
+
+ctx = costobs.<span class="f">WithMetadata</span>(ctx, costobs.Metadata{
+    CustomerID: <span class="s">"cust-42"</span>, Feature: <span class="s">"summarize"</span>,
+})</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step reveal">
+        <div class="step-no">step 02</div>
+        <div>
+          <h3>Cost is computed locally, shipped async</h3>
+          <p>Exact decimal math from a versioned pricing file: per-token,
+          cached tokens, reasoning, image tiles, audio-seconds, TTS
+          characters. Events batch to your own ingest service and land in
+          ClickHouse rollups built for sub-second queries at 10M+ events.</p>
+        </div>
+      </div>
+
+      <div class="step reveal">
+        <div class="step-no">step 03</div>
+        <div>
+          <h3>Ask the questions finance keeps asking you</h3>
+          <p>What does customer X cost us? Which feature burns the budget? Did
+          prompt v3 make things cheaper or just slower? What will month-end
+          look like? Is our tracked spend matching the provider's actual
+          bill — and if not, who's spending outside the SDK?</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="shot panel panel--ticked reveal">
+      <img src="assets/dashboard.png" alt="CostObs dashboard — dark console UI showing total spend, daily spend chart, provider donut and top models" loading="lazy" />
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="block" id="features">
+  <div class="wrap">
+    <p class="label-mono eyebrow">03 / what's in the box</p>
+    <h2>The whole cost loop, not just a counter</h2>
+    <div class="grid-8">
+      <div class="feature panel reveal"><div class="icon">◔</div>
+        <h3>Per-request attribution</h3>
+        <p>Customer, feature, team, service, environment, user, trace, prompt
+        version — plus any custom tag.</p>
+      </div>
+      <div class="feature panel reveal"><div class="icon">⚖</div>
+        <h3>Invoice reconciliation</h3>
+        <p>Sync actual bills from provider admin APIs. See drift and untracked
+        spend per provider, per day.</p>
+      </div>
+      <div class="feature panel reveal"><div class="icon">⌁</div>
+        <h3>Seasonal forecasting</h3>
+        <p>Holt-Winters weekly seasonality + linear &amp; exponential fits with
+        R². Month-end estimates that respect your weekend dip.</p>
+      </div>
+      <div class="feature panel reveal"><div class="icon">⑂</div>
+        <h3>Prompt version A/B</h3>
+        <p>Cost per request, output tokens, and p95 latency across versions of
+        the same prompt, side by side.</p>
+      </div>
+      <div class="feature panel reveal"><div class="icon">▲</div>
+        <h3>Alerts that fire</h3>
+        <p>Daily thresholds, spike detection, monthly budgets → Slack or any
+        webhook, with cooldowns.</p>
+      </div>
+      <div class="feature panel reveal"><div class="icon">⌬</div>
+        <h3>Every provider</h3>
+        <p>OpenAI, Anthropic, Gemini, Bedrock, LiteLLM, Vercel AI SDK, every
+        OpenAI-compatible API — and record() for the rest.</p>
+      </div>
+      <div class="feature panel reveal"><div class="icon">⎇</div>
+        <h3>Cost per merged PR</h3>
+        <p>Tag calls in CI with pr / engineer / experiment and slice spend by
+        any tag. Engineering ROI as a query.</p>
+      </div>
+      <div class="feature panel reveal"><div class="icon">⛁</div>
+        <h3>Built to self-host</h3>
+        <p>Compose for a laptop, Helm for prod, BYO Postgres + ClickHouse.
+        Prometheus metrics on every service.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="block" id="compare">
+  <div class="wrap">
+    <p class="label-mono eyebrow">04 / the honest comparison</p>
+    <h2>CostObs vs. SaaS cost trackers</h2>
+    <p class="section-sub">Same job. Different philosophy about who holds your data.</p>
+    <table class="compare reveal">
+      <thead>
+        <tr><th>Capability</th><th>CostObs</th><th>Typical SaaS tracker</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Per-request attribution (customer / feature / team / tag)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>Invoice reconciliation &amp; untracked spend</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>Spend forecasting</td><td class="yes">✓ free, seasonal</td><td class="meh">paid tier</td></tr>
+        <tr><td>Prompt version A/B with p95 latency</td><td class="yes">✓</td><td class="no">—</td></tr>
+        <tr><td>Your data stays on your infra</td><td class="yes">✓ always</td><td class="no">✕ their cloud</td></tr>
+        <tr><td>Works air-gapped</td><td class="yes">✓</td><td class="no">✕</td></tr>
+        <tr><td>Open source, auditable wire schema</td><td class="yes">✓ Apache-2.0</td><td class="no">✕</td></tr>
+        <tr><td>Price</td><td class="yes">$0 + your hardware</td><td class="meh">$30–$200+/mo</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ====================================================================== -->
+<section class="block" id="start">
+  <div class="wrap">
+    <p class="label-mono eyebrow">05 / start now</p>
+    <h2>Dashboard in five minutes</h2>
+    <div class="quickstart">
+      <div style="min-width:0">
+<pre class="code" data-copy>git clone https://github.com/officialasishkumar/costobs
+cd costobs
+cp .env.example .env
+docker compose up
+
+<span class="c"># populated dashboard without a provider key:</span>
+make demo-data</pre>
+      </div>
+      <div class="panel panel--ticked">
+        <h3>That brings up</h3>
+        <ol>
+          <li>ClickHouse + Postgres, migrated and seeded</li>
+          <li><code class="inline">ingest</code> :8080 — authenticated event intake</li>
+          <li><code class="inline">alertd</code> — thresholds, spikes, budgets</li>
+          <li><code class="inline">billsyncd</code> — opt-in invoice sync</li>
+          <li>the console at <strong>localhost:3000</strong></li>
+        </ol>
+        <p style="margin-top:14px"><a href="docs.html">Read the docs →</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>costobs · apache-2.0 · self-hosted ai cost observability</p>
+    <p>
+      <a href="https://github.com/officialasishkumar/costobs">github</a> ·
+      <a href="docs.html">docs</a> ·
+      <a href="https://github.com/officialasishkumar/costobs/issues">issues</a>
+    </p>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>
