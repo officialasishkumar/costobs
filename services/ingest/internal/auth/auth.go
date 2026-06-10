@@ -5,6 +5,7 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"sync"
 	"time"
@@ -41,7 +42,13 @@ type Authenticator struct {
 	now   func() time.Time
 
 	mu    sync.RWMutex
-	cache map[string]cacheEntry // keyed by raw key
+	cache map[[32]byte]cacheEntry // keyed by SHA-256 of the raw key
+}
+
+// cacheKey hashes the raw bearer key so plaintext credentials never sit in the
+// process heap (visible in heap dumps, cores, profiler snapshots).
+func cacheKey(rawKey string) [32]byte {
+	return sha256.Sum256([]byte(rawKey))
 }
 
 // NewAuthenticator builds an Authenticator with a verified-key cache TTL.
@@ -53,7 +60,7 @@ func NewAuthenticator(store Store, ttl time.Duration) *Authenticator {
 		store: store,
 		ttl:   ttl,
 		now:   time.Now,
-		cache: make(map[string]cacheEntry),
+		cache: make(map[[32]byte]cacheEntry),
 	}
 }
 
@@ -66,8 +73,9 @@ func (a *Authenticator) Authenticate(ctx context.Context, rawKey string) (string
 	}
 
 	now := a.now()
+	ck := cacheKey(rawKey)
 	a.mu.RLock()
-	ent, ok := a.cache[rawKey]
+	ent, ok := a.cache[ck]
 	a.mu.RUnlock()
 	if ok && now.Before(ent.expires) {
 		return ent.orgSlug, nil
@@ -84,7 +92,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, rawKey string) (string
 	}
 
 	a.mu.Lock()
-	a.cache[rawKey] = cacheEntry{orgSlug: rec.OrgSlug, expires: now.Add(a.ttl)}
+	a.cache[ck] = cacheEntry{orgSlug: rec.OrgSlug, expires: now.Add(a.ttl)}
 	a.mu.Unlock()
 
 	return rec.OrgSlug, nil

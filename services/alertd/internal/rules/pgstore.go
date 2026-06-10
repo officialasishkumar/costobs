@@ -83,13 +83,20 @@ func (s *PGStore) LoadEnabledRules(ctx context.Context) ([]Rule, error) {
 		return out, nil
 	}
 
+	// Filter by the rule IDs we actually loaded (not `r.enabled = true` again):
+	// the two queries run under different snapshots, so a rule enabled between
+	// them would match the JOIN but miss byID, silently dropping its targets.
+	ruleIDs := make([]int64, 0, len(out))
+	for _, r := range out {
+		ruleIDs = append(ruleIDs, r.ID)
+	}
+
 	const targetQ = `
 		SELECT t.id, t.rule_id, t.kind, t.config::text
 		FROM alert_targets t
-		JOIN alert_rules r ON r.id = t.rule_id
-		WHERE r.enabled = true`
+		WHERE t.rule_id = ANY($1)`
 
-	trows, err := s.pool.Query(ctx, targetQ)
+	trows, err := s.pool.Query(ctx, targetQ, ruleIDs)
 	if err != nil {
 		return nil, fmt.Errorf("query alert_targets: %w", err)
 	}

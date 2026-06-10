@@ -103,9 +103,13 @@ func (s *PGStore) Seed(ctx context.Context, orgSlug, rawKey string, log *slog.Lo
 	if err != nil {
 		return fmt.Errorf("seed: hash key: %w", err)
 	}
+	// ON CONFLICT targets the api_keys_active_prefix partial unique index so
+	// two instances seeding concurrently (rolling deploys) can't race the
+	// SELECT above into a duplicate-key startup failure.
 	if _, err := s.pool.Exec(ctx, `
 		INSERT INTO api_keys (org_id, name, key_prefix, key_hash)
-		VALUES ($1, $2, $3, $4)`,
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (key_prefix) WHERE revoked_at IS NULL DO NOTHING`,
 		orgID, "dev-seed", prefix, []byte(hash)); err != nil {
 		return fmt.Errorf("seed: insert api key: %w", err)
 	}

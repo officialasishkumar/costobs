@@ -22,6 +22,7 @@ type Options struct {
 	Capacity      int           // hard cap on buffered events (defaults to 2*MaxEvents)
 	RetryAttempts int           // insert retry attempts (default 5)
 	RetryBackoff  time.Duration // initial backoff (default 100ms)
+	FlushTimeout  time.Duration // hard deadline per flush incl. retries (default 30s)
 }
 
 // Buffer is the bounded event buffer + flush loop.
@@ -59,6 +60,9 @@ func New(w chwriter.Writer, m *metrics.Metrics, log *slog.Logger, opts Options) 
 	}
 	if opts.RetryBackoff <= 0 {
 		opts.RetryBackoff = 100 * time.Millisecond
+	}
+	if opts.FlushTimeout <= 0 {
+		opts.FlushTimeout = 30 * time.Second
 	}
 	return &Buffer{
 		opts:     opts,
@@ -132,11 +136,20 @@ func (b *Buffer) Run() {
 		case <-b.stop:
 			return
 		case <-ticker.C:
-			b.flush(context.Background())
+			b.flushWithTimeout()
 		case <-b.flushReq:
-			b.flush(context.Background())
+			b.flushWithTimeout()
 		}
 	}
+}
+
+// flushWithTimeout bounds a single flush (including retries) so a hung
+// ClickHouse connection can't stall the loop indefinitely and back the HTTP
+// layer up into permanent 429s.
+func (b *Buffer) flushWithTimeout() {
+	ctx, cancel := context.WithTimeout(context.Background(), b.opts.FlushTimeout)
+	defer cancel()
+	b.flush(ctx)
 }
 
 // flush drains the current buffer and writes it with bounded retry.
