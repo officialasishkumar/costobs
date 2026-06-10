@@ -45,6 +45,7 @@
     "tool_tokens":         { "type": "integer", "minimum": 0, "default": 0 },
     "total_tokens":        { "type": "integer", "minimum": 0, "default": 0 },
     "audio_seconds":       { "type": "number", "minimum": 0, "default": 0 },
+    "characters":          { "type": "integer", "minimum": 0, "default": 0, "description": "Billable characters (e.g. TTS input)" },
     "image_count":         { "type": "integer", "minimum": 0, "default": 0 },
     "image_tiles":         { "type": "integer", "minimum": 0, "default": 0 },
 

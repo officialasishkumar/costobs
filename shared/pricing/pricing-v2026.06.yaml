@@ -74,13 +74,104 @@ models:
     cached_input_per_token: 0.000000075
     output_per_token: 0.0000025
 
-  # ---- Audio (per-second billing) ----
+  # ---- xAI ----
+  - provider: xai
+    model: grok-4
+    match: prefix
+    input_per_token: 0.000003
+    cached_input_per_token: 0.00000075
+    output_per_token: 0.000015
+
+  - provider: xai
+    model: grok-3-mini
+    match: prefix
+    input_per_token: 0.0000003
+    output_per_token: 0.0000005
+
+  # ---- DeepSeek ----
+  - provider: deepseek
+    model: deepseek-chat
+    match: prefix
+    input_per_token: 0.00000027
+    cached_input_per_token: 0.00000007
+    output_per_token: 0.0000011
+
+  - provider: deepseek
+    model: deepseek-reasoner
+    match: prefix
+    input_per_token: 0.00000055
+    output_per_token: 0.00000219
+    reasoning_per_token: 0.00000219
+
+  # ---- Mistral ----
+  - provider: mistral
+    model: mistral-large
+    match: prefix
+    input_per_token: 0.000002
+    output_per_token: 0.000006
+
+  # ---- AWS Bedrock (model IDs as the Bedrock runtime reports them) ----
+  - provider: bedrock
+    model: anthropic.claude-opus-4
+    match: prefix
+    input_per_token: 0.000015
+    cached_input_per_token: 0.0000015
+    output_per_token: 0.000075
+
+  - provider: bedrock
+    model: anthropic.claude-sonnet-4
+    match: prefix
+    input_per_token: 0.000003
+    cached_input_per_token: 0.0000003
+    output_per_token: 0.000015
+
+  - provider: bedrock
+    model: anthropic.claude-haiku-4
+    match: prefix
+    input_per_token: 0.0000008
+    cached_input_per_token: 0.00000008
+    output_per_token: 0.000004
+
+  - provider: bedrock
+    model: amazon.nova-pro
+    match: prefix
+    input_per_token: 0.0000008
+    output_per_token: 0.0000032
+
+  - provider: bedrock
+    model: amazon.nova-lite
+    match: prefix
+    input_per_token: 0.00000006
+    output_per_token: 0.00000024
+
+  # ---- Audio: STT (per-second billing) ----
   - provider: deepgram
     model: nova-3
+    match: prefix
     operation: audio
     audio_per_second: 0.0000071
 
+  - provider: deepgram
+    model: nova-2
+    match: prefix
+    operation: audio
+    audio_per_second: 0.0000060
+
+  # ---- Audio: TTS (per-character billing) ----
   - provider: elevenlabs
     model: eleven_multilingual_v2
+    match: prefix
     operation: audio
-    audio_per_second: 0.0001
+    per_character: 0.0003
+
+  - provider: elevenlabs
+    model: eleven_turbo_v2
+    match: prefix
+    operation: audio
+    per_character: 0.00015
+
+  - provider: elevenlabs
+    model: eleven_flash_v2
+    match: prefix
+    operation: audio
+    per_character: 0.00015

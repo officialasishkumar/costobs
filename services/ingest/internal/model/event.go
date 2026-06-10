@@ -40,6 +40,7 @@ type Event struct {
 	ToolTokens        uint32  `json:"tool_tokens"`
 	TotalTokens       uint32  `json:"total_tokens"`
 	AudioSeconds      float32 `json:"audio_seconds"`
+	Characters        uint32  `json:"characters"`
 	ImageCount        uint16  `json:"image_count"`
 	ImageTiles        uint32  `json:"image_tiles"`
 
@@ -88,6 +89,7 @@ type eventAlias struct {
 	ToolTokens        uint32  `json:"tool_tokens"`
 	TotalTokens       uint32  `json:"total_tokens"`
 	AudioSeconds      float32 `json:"audio_seconds"`
+	Characters        uint32  `json:"characters"`
 	ImageCount        uint16  `json:"image_count"`
 	ImageTiles        uint32  `json:"image_tiles"`
 
@@ -132,6 +134,7 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 	e.ToolTokens = a.ToolTokens
 	e.TotalTokens = a.TotalTokens
 	e.AudioSeconds = a.AudioSeconds
+	e.Characters = a.Characters
 	e.ImageCount = a.ImageCount
 	e.ImageTiles = a.ImageTiles
 	e.PricingVersion = a.PricingVersion

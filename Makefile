@@ -39,3 +39,8 @@ fmt:
 	cd services/ingest && go fmt ./...
 	cd services/alertd && go fmt ./...
 	cd sdks/python && python -m ruff format . || true
+
+# copy the canonical pricing file into both SDK bundles
+sync-pricing:
+	cp shared/pricing/pricing-v2026.06.yaml sdks/python/costobs/data/
+	cp shared/pricing/pricing-v2026.06.yaml sdks/typescript/src/data/

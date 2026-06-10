@@ -46,6 +46,7 @@
         },
 
         "audio_per_second": { "type": "number", "minimum": 0 },
+        "per_character":    { "type": "number", "minimum": 0, "description": "Per billable character (e.g. TTS input text)" },
 
         "batch_discount": { "type": "number", "minimum": 0, "maximum": 1, "description": "Multiplier for Batch API, e.g. 0.5 = 50% off" },
         "finetune_surcharge": { "type": "number", "minimum": 1, "description": "Multiplier for fine-tuned variants, e.g. 1.5" }

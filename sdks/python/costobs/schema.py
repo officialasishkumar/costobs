@@ -26,6 +26,7 @@ class Usage:
     tool_tokens: int = 0
     total_tokens: int = 0
     audio_seconds: float = 0.0
+    characters: int = 0
     image_count: int = 0
     image_tiles: int = 0
 
@@ -74,6 +75,7 @@ class Event:
     tool_tokens: int = 0
     total_tokens: int = 0
     audio_seconds: float = 0.0
+    characters: int = 0
     image_count: int = 0
     image_tiles: int = 0
 
@@ -109,6 +111,7 @@ class Event:
             "tool_tokens": self.tool_tokens,
             "total_tokens": self.total_tokens,
             "audio_seconds": self.audio_seconds,
+            "characters": self.characters,
             "image_count": self.image_count,
             "image_tiles": self.image_tiles,
             "cost_usd": self.cost_usd,

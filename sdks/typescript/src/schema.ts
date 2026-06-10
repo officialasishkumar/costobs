@@ -27,6 +27,7 @@ export interface Usage {
   tool_tokens: number;
   total_tokens: number;
   audio_seconds: number;
+  characters: number;
   image_count: number;
   image_tiles: number;
 }
@@ -44,6 +45,7 @@ export function makeUsage(partial: Partial<Usage> = {}): Usage {
     tool_tokens: partial.tool_tokens ?? 0,
     total_tokens: partial.total_tokens ?? 0,
     audio_seconds: partial.audio_seconds ?? 0,
+    characters: partial.characters ?? 0,
     image_count: partial.image_count ?? 0,
     image_tiles: partial.image_tiles ?? 0,
   };
@@ -88,6 +90,7 @@ export interface Event {
   tool_tokens: number;
   total_tokens: number;
   audio_seconds: number;
+  characters: number;
   image_count: number;
   image_tiles: number;
 

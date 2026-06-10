@@ -48,6 +48,7 @@ class _ModelRule:
         "tool",
         "image_tiers",
         "audio_per_second",
+        "per_character",
         "batch_discount",
         "finetune_surcharge",
     )
@@ -73,6 +74,9 @@ class _ModelRule:
         self.image_tiers: List[dict] = raw.get("image_tiers", []) or []
         self.audio_per_second = (
             _dec(raw["audio_per_second"]) if "audio_per_second" in raw else None
+        )
+        self.per_character = (
+            _dec(raw["per_character"]) if "per_character" in raw else None
         )
         self.batch_discount = (
             _dec(raw["batch_discount"]) if "batch_discount" in raw else None
@@ -172,6 +176,10 @@ class PricingEngine:
         # Audio (per second).
         if usage.audio_seconds and rule.audio_per_second is not None:
             total += rule.audio_per_second * _dec(usage.audio_seconds)
+
+        # Characters (e.g. TTS input text).
+        if usage.characters and rule.per_character is not None:
+            total += rule.per_character * usage.characters
 
         # Images (per tile within the first/default tier + flat base per image).
         if usage.image_tiles and rule.image_tiers:

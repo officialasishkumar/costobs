@@ -27,7 +27,7 @@ const insertSQL = `INSERT INTO events (
 	request_id, org_id, ts,
 	provider, model, operation, stream, status, error_type,
 	environment, team, service, customer_id, user_id, trace_id, feature, prompt_key, prompt_version, tags,
-	input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, tool_tokens, total_tokens, audio_seconds, image_count, image_tiles,
+	input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, tool_tokens, total_tokens, audio_seconds, characters, image_count, image_tiles,
 	cost_usd, pricing_version,
 	latency_ms, sdk_lang, sdk_version
 )`
@@ -88,7 +88,7 @@ func (w *ClickHouseWriter) Insert(ctx context.Context, events []model.Event) err
 			e.RequestID, e.OrgID, e.TS,
 			e.Provider, e.Model, e.Operation, stream, e.Status, e.ErrorType,
 			e.Environment, e.Team, e.Service, e.CustomerID, e.UserID, e.TraceID, e.Feature, e.PromptKey, e.PromptVersion, tags,
-			e.InputTokens, e.CachedInputTokens, e.OutputTokens, e.ReasoningTokens, e.ToolTokens, e.TotalTokens, e.AudioSeconds, e.ImageCount, e.ImageTiles,
+			e.InputTokens, e.CachedInputTokens, e.OutputTokens, e.ReasoningTokens, e.ToolTokens, e.TotalTokens, e.AudioSeconds, e.Characters, e.ImageCount, e.ImageTiles,
 			e.CostUsd, e.PricingVersion,
 			e.LatencyMs, e.SDKLang, e.SDKVersion,
 		); err != nil {

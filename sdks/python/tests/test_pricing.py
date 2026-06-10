@@ -146,3 +146,39 @@ models:
     eng = PricingEngine(yaml_text)
     usage = Usage(input_tokens=100)
     assert eng.cost(usage, "openai", "gpt-special", "chat") == Decimal("0.002") * 100
+
+
+def test_per_character_tts_pricing():
+    from costobs.pricing import PricingEngine
+    from costobs.schema import Usage
+
+    engine = PricingEngine.default()
+    cost = engine.cost(
+        Usage(characters=1000),
+        "elevenlabs",
+        "eleven_multilingual_v2",
+        operation="audio",
+    )
+    assert float(cost) == pytest.approx(0.3)  # 1000 chars * 0.0003
+
+
+def test_audio_seconds_stt_pricing():
+    from costobs.pricing import PricingEngine
+    from costobs.schema import Usage
+
+    engine = PricingEngine.default()
+    cost = engine.cost(Usage(audio_seconds=600.0), "deepgram", "nova-3", operation="audio")
+    assert float(cost) == pytest.approx(600 * 0.0000071)
+
+
+def test_bedrock_model_id_pricing():
+    from costobs.pricing import PricingEngine
+    from costobs.schema import Usage
+
+    engine = PricingEngine.default()
+    cost = engine.cost(
+        Usage(input_tokens=1000, output_tokens=100),
+        "bedrock",
+        "anthropic.claude-sonnet-4-6-v1:0",
+    )
+    assert float(cost) == pytest.approx(1000 * 0.000003 + 100 * 0.000015)

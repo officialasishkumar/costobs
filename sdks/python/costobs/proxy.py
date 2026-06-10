@@ -236,6 +236,7 @@ def _emit(
         tool_tokens=usage.tool_tokens,
         total_tokens=usage.total_tokens,
         audio_seconds=usage.audio_seconds,
+        characters=usage.characters,
         image_count=usage.image_count,
         image_tiles=usage.image_tiles,
         cost_usd=float(cost),
