@@ -23,10 +23,12 @@ from __future__ import annotations
 __version__ = "0.1.0"
 
 from .context import async_request_context, request_context, trace
+from .record import record
 from .wrap import configure, flush, shutdown, wrap
 
 __all__ = [
     "wrap",
+    "record",
     "request_context",
     "async_request_context",
     "trace",

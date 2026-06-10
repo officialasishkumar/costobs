@@ -126,6 +126,7 @@ def _ensure_loaded() -> None:
             return
         # Import built-in adapters to populate the registry.
         from . import anthropic as _a  # noqa: F401
+        from . import bedrock as _b  # noqa: F401
         from . import gemini as _g  # noqa: F401
         from . import litellm as _l  # noqa: F401
         from . import openai as _o  # noqa: F401

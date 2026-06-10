@@ -20,6 +20,10 @@
 
 export { wrap, configure, flush, shutdown } from "./wrap.js";
 export type { WrapOptions } from "./wrap.js";
+export { record } from "./record.js";
+export type { RecordOptions } from "./record.js";
+export { trackGenerateText, trackStreamText } from "./vercel.js";
+export type { VercelTrackMeta } from "./vercel.js";
 export { requestContext, currentContext } from "./context.js";
 export type { RequestContext } from "./context.js";
 export { PricingEngine } from "./pricing.js";
