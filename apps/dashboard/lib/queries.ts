@@ -497,6 +497,165 @@ export async function getPromptComparison(
 }
 
 // ---------------------------------------------------------------------------
+// RECONCILIATION  (tracked SDK estimates vs billed_daily synced by billsyncd)
+//   billed_daily is a ReplacingMergeTree(synced_at): aggregate with argMax.
+// ---------------------------------------------------------------------------
+
+export interface ProviderReconRow {
+  provider: string;
+  tracked_usd: number;
+  billed_usd: number;
+}
+
+export async function getReconciliationByProvider(
+  org: string,
+  from: string,
+  to: string,
+): Promise<ProviderReconRow[]> {
+  const params = { org, from, to };
+  assertOrgScoped(params);
+
+  const [tracked, billed] = await Promise.all([
+    chQuery<{ provider: string; total_cost: string }>(
+      `SELECT provider, sum(cost_usd) AS total_cost
+       FROM cost_daily
+       WHERE org_id = {org:String}
+         AND date >= {from:Date}
+         AND date <= {to:Date}
+       GROUP BY provider`,
+      params,
+    ),
+    chQuery<{ provider: string; total_billed: string }>(
+      `SELECT provider, sum(billed) AS total_billed
+       FROM (
+         SELECT provider, date, argMax(billed_usd, synced_at) AS billed
+         FROM billed_daily
+         WHERE org_id = {org:String}
+           AND date >= {from:Date}
+           AND date <= {to:Date}
+         GROUP BY provider, date
+       )
+       GROUP BY provider`,
+      params,
+    ),
+  ]);
+
+  const byProvider = new Map<string, ProviderReconRow>();
+  for (const r of tracked) {
+    byProvider.set(r.provider, {
+      provider: r.provider,
+      tracked_usd: Number(r.total_cost),
+      billed_usd: 0,
+    });
+  }
+  for (const r of billed) {
+    const row = byProvider.get(r.provider) ?? {
+      provider: r.provider,
+      tracked_usd: 0,
+      billed_usd: 0,
+    };
+    row.billed_usd = Number(r.total_billed);
+    byProvider.set(r.provider, row);
+  }
+  return [...byProvider.values()].sort((a, b) => b.billed_usd + b.tracked_usd - (a.billed_usd + a.tracked_usd));
+}
+
+export interface ReconDailyPoint {
+  date: string;
+  tracked_usd: number;
+  billed_usd: number;
+}
+
+/** Daily tracked vs billed, restricted to providers that HAVE billing data
+ * (comparing against providers without a billing sync would show fake drift). */
+export async function getReconciliationDaily(
+  org: string,
+  from: string,
+  to: string,
+): Promise<ReconDailyPoint[]> {
+  const params = { org, from, to };
+  assertOrgScoped(params);
+
+  const [tracked, billed] = await Promise.all([
+    chQuery<{ day: string; total_cost: string }>(
+      `SELECT toString(date) AS day, sum(cost_usd) AS total_cost
+       FROM cost_daily
+       WHERE org_id = {org:String}
+         AND date >= {from:Date}
+         AND date <= {to:Date}
+         AND provider IN (
+           SELECT DISTINCT provider FROM billed_daily WHERE org_id = {org:String}
+         )
+       GROUP BY date
+       ORDER BY date ASC`,
+      params,
+    ),
+    chQuery<{ day: string; total_billed: string }>(
+      `SELECT toString(date) AS day, sum(billed) AS total_billed
+       FROM (
+         SELECT date, argMax(billed_usd, synced_at) AS billed
+         FROM billed_daily
+         WHERE org_id = {org:String}
+           AND date >= {from:Date}
+           AND date <= {to:Date}
+         GROUP BY provider, date
+       )
+       GROUP BY date
+       ORDER BY date ASC`,
+      params,
+    ),
+  ]);
+
+  const byDay = new Map<string, ReconDailyPoint>();
+  for (const r of tracked) {
+    byDay.set(r.day, { date: r.day, tracked_usd: Number(r.total_cost), billed_usd: 0 });
+  }
+  for (const r of billed) {
+    const row = byDay.get(r.day) ?? { date: r.day, tracked_usd: 0, billed_usd: 0 };
+    row.billed_usd = Number(r.total_billed);
+    byDay.set(r.day, row);
+  }
+  return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ---------------------------------------------------------------------------
+// MONTH-OVER-MONTH  (month-to-date vs the same day-count of last month)
+// ---------------------------------------------------------------------------
+
+export interface MoMTotals {
+  current_mtd: number;
+  previous_mtd: number;
+  /** Percentage change, null when there is no previous-month baseline. */
+  delta_pct: number | null;
+}
+
+export async function getMoMTotals(org: string): Promise<MoMTotals> {
+  const params = { org };
+  assertOrgScoped(params);
+  const rows = await chQuery<{ cur: string; prev: string }>(
+    `SELECT
+        sumIf(cost_usd, date >= toStartOfMonth(today())) AS cur,
+        sumIf(
+          cost_usd,
+          date >= toStartOfMonth(today() - INTERVAL 1 MONTH)
+          AND date <= toStartOfMonth(today() - INTERVAL 1 MONTH)
+                      + (today() - toStartOfMonth(today()))
+        ) AS prev
+     FROM cost_daily
+     WHERE org_id = {org:String}
+       AND date >= toStartOfMonth(today() - INTERVAL 1 MONTH)`,
+    params,
+  );
+  const cur = Number(rows[0]?.cur ?? 0);
+  const prev = Number(rows[0]?.prev ?? 0);
+  return {
+    current_mtd: cur,
+    previous_mtd: prev,
+    delta_pct: prev > 0 ? ((cur - prev) / prev) * 100 : null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // FORECAST  (cost_daily daily totals — last 30 days input)
 // ---------------------------------------------------------------------------
 

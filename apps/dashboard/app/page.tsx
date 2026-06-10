@@ -5,6 +5,7 @@ import {
   getDailySpend,
   getCostByProvider,
   getCostByModel,
+  getMoMTotals,
 } from '@/lib/queries';
 import { KpiCards } from '@/components/KpiCards';
 import { SpendChart } from '@/components/SpendChart';
@@ -41,17 +42,18 @@ export default async function OverviewPage({
   );
 
   try {
-    const [totals, daily, byProvider, byModel] = await Promise.all([
+    const [totals, daily, byProvider, byModel, mom] = await Promise.all([
       getOverviewTotals(org, range.from, range.to),
       getDailySpend(org, range.from, range.to),
       getCostByProvider(org, range.from, range.to),
       getCostByModel(org, range.from, range.to),
+      getMoMTotals(org),
     ]);
 
     return (
       <div className="space-y-6">
         {header}
-        <KpiCards kpis={totals} spark={daily} />
+        <KpiCards kpis={totals} spark={daily} momDeltaPct={mom.delta_pct} />
         <SpendChart data={daily} />
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ProviderDonut data={byProvider} />

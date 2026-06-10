@@ -75,9 +75,19 @@ const LINKS: NavItem[] = [
     ),
   },
   {
+    href: '/reconciliation',
+    label: 'Reconcile',
+    code: '06',
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M12 3v18M5 7h14M5 7l-2.5 6a3.5 3.5 0 0 0 5 0L5 7Zm14 0-2.5 6a3.5 3.5 0 0 0 5 0L19 7Z" />
+      </svg>
+    ),
+  },
+  {
     href: '/settings',
     label: 'Settings',
-    code: '06',
+    code: '07',
     icon: (
       <svg {...ICON_PROPS}>
         <circle cx="12" cy="12" r="3" />
