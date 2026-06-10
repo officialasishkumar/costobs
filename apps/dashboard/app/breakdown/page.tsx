@@ -1,6 +1,6 @@
 import { currentOrgSlug } from '@/lib/tenant';
 import { resolveRange } from '@/lib/range';
-import { getBreakdown, type BreakdownDim } from '@/lib/queries';
+import { getBreakdown, getTagBreakdown, type BreakdownDim } from '@/lib/queries';
 import { BreakdownControls } from '@/components/BreakdownControls';
 import { BreakdownView } from '@/components/BreakdownView';
 import { PageHeader } from '@/components/PageHeader';
@@ -25,25 +25,37 @@ const LABELS: Record<BreakdownDim, string> = {
   provider: 'Provider',
 };
 
+/** Tag keys are user-defined but must stay sane as a URL param. */
+function parseTagKey(v: string | undefined): string {
+  if (!v) return '';
+  const cleaned = v.trim().slice(0, 64);
+  return /^[\w.:-]+$/.test(cleaned) ? cleaned : '';
+}
+
 export default async function BreakdownPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; primary?: string; secondary?: string }>;
+  searchParams: Promise<{ range?: string; primary?: string; secondary?: string; tag?: string }>;
 }) {
   const sp = await searchParams;
   const range = resolveRange(sp.range);
   const primary = parseDim(sp.primary, 'feature')!;
   const secondary = parseDim(sp.secondary, null);
+  const tagKey = parseTagKey(sp.tag);
   const org = await currentOrgSlug();
 
   let body: React.ReactNode;
   try {
-    const rows = await getBreakdown(org, range.from, range.to, primary, secondary);
+    // A tag key overrides the dimension picker: slice by tags[<key>] instead
+    // (the engineering-ROI path, e.g. tag=pr for cost per merged PR).
+    const rows = tagKey
+      ? await getTagBreakdown(org, range.from, range.to, tagKey)
+      : await getBreakdown(org, range.from, range.to, primary, secondary);
     body = (
       <BreakdownView
         rows={rows}
-        primaryLabel={LABELS[primary]}
-        secondaryLabel={secondary ? LABELS[secondary] : null}
+        primaryLabel={tagKey ? `tag:${tagKey}` : LABELS[primary]}
+        secondaryLabel={tagKey ? null : secondary ? LABELS[secondary] : null}
       />
     );
   } catch (err) {
@@ -55,12 +67,13 @@ export default async function BreakdownPage({
       <PageHeader
         eyebrow="02 / breakdown"
         title="Cost attribution"
-        description="Slice spend by customer, feature, team, model, or provider — pairwise."
+        description="Slice spend by customer, feature, team, model, provider — or any custom tag (pr, engineer, experiment)."
       />
       <BreakdownControls
         primary={primary}
         secondary={secondary ?? ''}
         range={range.key}
+        tagKey={tagKey}
       />
       {body}
     </div>

@@ -270,6 +270,43 @@ export async function getBreakdown(
   return rows.map(mapBreakdown);
 }
 
+/**
+ * Breakdown by an arbitrary event tag key (e.g. pr, engineer, experiment).
+ * Tags ride the events Map column, so this reads raw events — bounded by the
+ * date range, org filter, and LIMIT. This is the engineering-ROI primitive:
+ * tag calls with pr=1234 in CI and slice cost per merged PR.
+ */
+export async function getTagBreakdown(
+  org: string,
+  from: string,
+  to: string,
+  tagKey: string,
+): Promise<BreakdownRow[]> {
+  const params = { org, from, to, tagKey };
+  assertOrgScoped(params);
+  const rows = await chQuery<{
+    primary: string;
+    secondary: string | null;
+    total_cost: string;
+    total_requests: string;
+  }>(
+    `SELECT tags[{tagKey:String}] AS primary,
+            NULL AS secondary,
+            sum(cost_usd) AS total_cost,
+            count()       AS total_requests
+     FROM events
+     WHERE org_id = {org:String}
+       AND ts >= toDateTime({from:Date})
+       AND ts <  toDateTime({to:Date}) + INTERVAL 1 DAY
+       AND tags[{tagKey:String}] != ''
+     GROUP BY primary
+     ORDER BY total_cost DESC
+     LIMIT 200`,
+    params,
+  );
+  return rows.map(mapBreakdown);
+}
+
 function mapBreakdown(r: {
   primary: string;
   secondary: string | null;

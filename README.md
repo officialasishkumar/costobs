@@ -24,17 +24,33 @@ your own (even air-gapped) cluster.
 ## Features
 
 - **Per-request cost attribution** by customer, feature, team, service,
-  environment, user, trace, and prompt version.
-- **Multi-provider:** OpenAI, Anthropic, Gemini, and more via thin SDK adapters.
+  environment, user, trace, prompt version — and **any custom tag**
+  (cost per PR, per engineer, per experiment: see
+  [docs/engineering-roi.md](docs/engineering-roi.md)).
+- **Multi-provider:** OpenAI, Anthropic, Gemini, AWS Bedrock, LiteLLM, the
+  Vercel AI SDK, and every OpenAI-compatible API (xAI/Grok, Together,
+  Fireworks, OpenRouter, Groq, DeepSeek, Mistral, Azure) auto-detected from
+  the client's base URL. Anything else via the manual `record()` API
+  (Deepgram audio-seconds, ElevenLabs characters, raw HTTP).
+- **Three ways to attach metadata:** wrap-time defaults, `request_context()`
+  context manager, `@trace()` decorator — plus per-call overrides.
 - **Accurate local cost calc** from a versioned pricing file (per-token, cached
-  tokens, reasoning, tool, image tiers, audio, batch discount, fine-tune
-  surcharge), using exact decimal math. See [docs/pricing.md](docs/pricing.md).
+  tokens, reasoning, tool, image tiers, audio-seconds, characters, batch
+  discount, fine-tune surcharge), using exact decimal math.
+  See [docs/pricing.md](docs/pricing.md).
 - **No prompt/response content stored** — the wire schema has no slot for it.
 - **Time-series analytics** on ClickHouse with materialized rollups (daily cost,
   hourly attribution, prompt-version A/B with p95 latency).
+- **Invoice reconciliation** (`billsyncd`, opt-in): syncs actual billed cost
+  from OpenAI/Anthropic admin APIs and shows drift + untracked spend.
+  See [docs/billing-sync.md](docs/billing-sync.md).
+- **Forecasting:** linear + exponential spend projection with R², month-end
+  estimate — free, not a paid tier.
 - **Alerting** (`alertd`): daily thresholds, spikes, monthly budgets → webhook /
   Slack.
-- **Dashboard** (Next.js) with optional OIDC auth; defaults to single-user mode.
+- **Dashboard** (Next.js) — dark console UI with overview (MoM deltas),
+  pairwise + tag breakdowns, request drill-down, prompt A/B, forecast, and
+  reconciliation. Optional OIDC auth seam; defaults to single-user mode.
 - **Self-hosting first-class:** Mode A (Compose) and Mode B (Helm), both fully
   offline; BYO external Postgres + ClickHouse or use bundled single-node
   instances.
@@ -44,9 +60,11 @@ your own (even air-gapped) cluster.
 ## Monorepo layout
 
 ```
-sdks/python/         CostObs SDK: wrap() proxy, local pricing, async telemetry shipper
+sdks/python/         CostObs SDK: wrap() proxy, record(), local pricing, async telemetry shipper
+sdks/typescript/     Same for Node/TS, incl. Vercel AI SDK helpers
 services/ingest/     Go ingestion API (:8080): POST /v1/events, auth, dedup, batch→ClickHouse
 services/alertd/     Go periodic alert evaluator (singleton, :8081)
+services/billsyncd/  Go billing sync: provider admin APIs → billed_daily (opt-in, :8082)
 apps/dashboard/      Next.js UI + read API (:3000)
 db/postgres/         Postgres migrations (metadata: orgs, api_keys, alert rules, overrides)
 db/clickhouse/       ClickHouse migrations (events fact table + materialized rollups)
@@ -139,6 +157,8 @@ Full details: **[docs/architecture.md](docs/architecture.md)**.
 - [docs/architecture.md](docs/architecture.md) — components, data flow, storage layers, wire contract, principles.
 - [docs/self-hosting.md](docs/self-hosting.md) — Mode A and Mode B, BYO databases, TLS/OIDC, scaling, air-gapped.
 - [docs/pricing.md](docs/pricing.md) — the versioned pricing file, field semantics, overrides, updating without an SDK release.
+- [docs/billing-sync.md](docs/billing-sync.md) — billsyncd setup, reconciliation semantics, manual invoice import.
+- [docs/engineering-roi.md](docs/engineering-roi.md) — cost per PR / engineer / experiment via tag attribution.
 
 ## Non-goals
 
